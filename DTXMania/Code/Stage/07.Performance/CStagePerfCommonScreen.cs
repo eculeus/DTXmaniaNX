@@ -3581,7 +3581,11 @@ namespace DTXMania
                                 CDTXMania.Skin.soundMetronome.tPlay(40);
                             }
                         }
-                        if ((ePlayMode == EInstrumentPart.DRUMS) && (configIni.nLaneDisp.Drums == 0 || configIni.nLaneDisp.Drums == 1) && pChip.bVisible && (this.txChip != null))
+                        if (bNotationView && ePlayMode == EInstrumentPart.DRUMS)
+                        {
+                            tDrawNotationBeatLine(pChip);
+                        }
+                        else if ((ePlayMode == EInstrumentPart.DRUMS) && (configIni.nLaneDisp.Drums == 0 || configIni.nLaneDisp.Drums == 1) && pChip.bVisible && (this.txChip != null))
                         {
                             int l_drumPanelWidth = 0x22f;
                             int l_xOffset = 0;
@@ -4619,6 +4623,9 @@ namespace DTXMania
             this.actFillin.OnUpdateAndDraw();
         }
         protected abstract void tUpdateAndDraw_Chip_BarLine(CConfigIni configIni, ref CDTX dTX, ref CChip pChip);
+        /// <summary>Drums screen returns true when the horizontal notation view is on.</summary>
+        protected virtual bool bNotationView { get { return false; } }
+        protected virtual void tDrawNotationBeatLine(CChip pChip) { }
         protected abstract void tDraw_LoopLine(CConfigIni configIni, bool bIsEnd);
         //protected abstract void t進行描画_チップ_ベース( CConfigIni configIni, ref CDTX dTX, ref CChip pChip );
         protected virtual void tUpdateAndDraw_Chip_Bass_Wailing(CConfigIni configIni, ref CDTX dTX, ref CChip pChip)  // t進行描画_チップ_ベース_ウェイリング

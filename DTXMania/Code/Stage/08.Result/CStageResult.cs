@@ -126,7 +126,12 @@ namespace DTXMania
 														 //18072020: Change first condition check to 1, XG mode is 1, not 0. Fisyher
 							if (CDTXMania.ConfigIni.nSkillMode == 1)
 							{
-								this.nRankValue[i] = CScoreIni.tCalculateRank(part);
+								// Grade from the same skill rate the song-select panel uses (it shows
+								// tCalculateRank(0, HighSkill)), so the result screen and the menu agree.
+								// A zero-skill run keeps the judgement-count grade (E) instead of UNKNOWN.
+								this.nRankValue[i] = part.dbPerformanceSkill > 0.0
+									? CScoreIni.tCalculateRank(0, part.dbPerformanceSkill)
+									: CScoreIni.tCalculateRank(part);
 							}
 							else if (CDTXMania.ConfigIni.nSkillMode == 0)
 							{

@@ -25,6 +25,7 @@ namespace DTXMania
 			base.ePhaseID = CStage.EPhase.Common_DefaultState;
 			base.bNotActivated = true;
 			base.listChildActivities.Add( this.actPad = new CActPerfDrumsPad() );
+			base.listChildActivities.Add( this.actNotation = new CActPerfDrumsNotation() );
 			base.listChildActivities.Add( this.actCombo = new CActPerfDrumsComboDGB() );
 			base.listChildActivities.Add( this.actDANGER = new CActPerfDrumsDanger() );
 			base.listChildActivities.Add( this.actChipFireD = new CActPerfDrumsChipFireD() );
@@ -209,7 +210,8 @@ namespace DTXMania
                 this.tUpdateAndDraw_Background();
                 this.tUpdateAndDraw_MIDIBGM();
                 this.tUpdateAndDraw_AVI();
-                this.tUpdateAndDraw_LaneFlushD();
+                if (bNotationView) this.actNotation.tDrawStaff();
+                if (!bNotationView) this.tUpdateAndDraw_LaneFlushD();
                 this.tUpdateAndDraw_ScrollSpeed();
                 this.tUpdateAndDraw_ChipAnimation();
                 this.tUpdateAndDraw_BarLines( EInstrumentPart.DRUMS );
@@ -220,13 +222,13 @@ namespace DTXMania
                 #region[ シャッター ]
                 //シャッターを使うのはLC、LP、FT、RDレーンのみ。その他のレーンでは一切使用しない。
                 //If Skill Mode is CLASSIC, always display lvl as Classic Style
-                if (CDTXMania.ConfigIni.nSkillMode == 0 || ((CDTXMania.ConfigIni.bCLASSIC譜面判別を有効にする == true ) && 
+                if (!bNotationView && (CDTXMania.ConfigIni.nSkillMode == 0 || ((CDTXMania.ConfigIni.bCLASSIC譜面判別を有効にする == true ) && 
                     ((CDTXMania.DTX.bチップがある.LeftCymbal == false) && 
                     ( CDTXMania.DTX.bチップがある.FT == false ) && 
                     ( CDTXMania.DTX.bチップがある.Ride == false ) && 
                     ( CDTXMania.DTX.bチップがある.LP == false ) &&
                     ( CDTXMania.DTX.bチップがある.LBD == false) &&
-                    ( CDTXMania.DTX.b強制的にXG譜面にする == false))) )
+                    ( CDTXMania.DTX.b強制的にXG譜面にする == false))) ))
                 {
                     if ( this.txLaneCover != null )
                     {
@@ -271,6 +273,7 @@ namespace DTXMania
                     }
                 }
 
+                if (!bNotationView) {
                 double db倍率 = 7.2;
                 double dbシャッターIN = (base.nShutterInPosY.Drums * db倍率);
                 double dbシャッターOUT = 720 - (base.nShutterOutPosY.Drums * db倍率);
@@ -302,9 +305,10 @@ namespace DTXMania
                         this.actLVFont.tDrawString(564, (int)dbシャッターOUT + 2, CDTXMania.ConfigIni.nShutterOutSide.Drums.ToString());
                 }
 
+                }
                 #endregion
-                this.tUpdateAndDraw_JudgementLine();
-                this.tUpdateAndDraw_DrumPad();
+                if (!bNotationView) this.tUpdateAndDraw_JudgementLine();
+                if (!bNotationView) this.tUpdateAndDraw_DrumPad();
                 bIsFinishedFadeout = this.tUpdateAndDraw_FadeIn_Out();
                 if (bIsFinishedPlaying && (base.ePhaseID == CStage.EPhase.Common_DefaultState) )
                 {
@@ -361,7 +365,7 @@ namespace DTXMania
                 this.tUpdateAndDraw_PerformanceInformation();
                 this.tUpdateAndDraw_JudgementString1_ForNormalPosition();
                 this.tUpdateAndDraw_JudgementString2_ForPositionOnJudgementLine();
-                this.tUpdateAndDraw_ChipFireD();
+                if (!bNotationView) this.tUpdateAndDraw_ChipFireD();
                 this.tUpdateAndDraw_PlaySpeed();
                 //
                 
@@ -483,6 +487,7 @@ namespace DTXMania
         public int nNumberOfMistakes;
         public int nNumberPerfects;
 		private CActPerfDrumsChipFireD actChipFireD;
+		private CActPerfDrumsNotation actNotation;
 		public CActPerfDrumsPad actPad;
 		public bool bInFillIn;
         public bool bEndFillIn;
@@ -2836,6 +2841,7 @@ namespace DTXMania
 
         protected override void tUpdateAndDraw_Chip_PatternOnly_Drums(CConfigIni configIni, ref CDTX dTX, ref CChip pChip)  // t進行描画_チップ_模様のみ_ドラムス
         {
+            if (bNotationView) return;
             if (configIni.bDrumsEnabled)
             {
                 #region [ Sudden処理 ]
@@ -3105,8 +3111,12 @@ namespace DTXMania
                 pChip.bHit = true;
             }
         }
+		protected override bool bNotationView { get { return CDTXMania.ConfigIni.bDrumsNotationView; } }
+		protected override void tDrawNotationBeatLine( CChip pChip ) { this.actNotation.tDrawBeatLine( pChip ); }
+
 		protected override void tUpdateAndDraw_Chip_Drums( CConfigIni configIni, ref CDTX dTX, ref CChip pChip )
 		{
+			if ( bNotationView ) { this.actNotation.tDrawChip( pChip ); return; }
 			if( configIni.bDrumsEnabled )
 			{
 				#region [ Sudden処理 ]
@@ -3870,6 +3880,7 @@ namespace DTXMania
 					dTX.tAutoCorrectWavPlaybackPosition();
 				}
 			}
+				if ( bNotationView ) { this.actNotation.tDrawBarLine( pChip, n小節番号plus1 - 1 ); return; }
 				if ( configIni.b演奏情報を表示する && ( configIni.nLaneDisp.Drums == 0 || configIni.nLaneDisp.Drums == 1 ) )
                 {
                         int n小節番号 = n小節番号plus1 - 1;
@@ -3916,6 +3927,7 @@ namespace DTXMania
             double ScrollSpeedDrums = (this.actScrollSpeed.db現在の譜面スクロール速度.Drums + 1.0) * 0.5 * 37.5 * speed / 60000.0;
 
             int nDistanceFromBar = (int)(((bIsEnd ? this.LoopEndMs : this.LoopBeginMs) - CSoundManager.rcPerformanceTimer.nCurrentTime) * ScrollSpeedDrums);
+            if (bNotationView) { this.actNotation.tDrawLoopLine(nDistanceFromBar, bIsEnd); return; }
 
             //Display Loop Begin/Loop End text
             CDTXMania.actDisplayString.tPrint(830, configIni.bReverse.Drums ? ((this.nJudgeLinePosY.Drums + nDistanceFromBar) - 0x11) : ((this.nJudgeLinePosY.Drums - nDistanceFromBar) - 0x11), CCharacterConsole.EFontType.White, (bIsEnd ? "End loop" : "Begin loop"));

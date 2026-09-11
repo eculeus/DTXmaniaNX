@@ -1275,6 +1275,11 @@ namespace DTXMania
                                 }
                             }
 
+                            if (CDTXMania.ConfigIni.bDrumsNotationView && j < 10)
+                            {
+                                num5 = CActPerfDrumsNotation.PLAYHEAD_X - (this.stレーンサイズ[j].w / 2);
+                                num6 = CActPerfDrumsNotation.JUDGE_Y;
+                            }
                             int nRectX = CDTXMania.ConfigIni.nJudgeWidgh;
                             int nRectY = CDTXMania.ConfigIni.nJudgeHeight;
 
@@ -1373,6 +1378,11 @@ namespace DTXMania
                                 }
                             }
 
+                            if (CDTXMania.ConfigIni.bDrumsNotationView && j < 10)
+                            {
+                                num5 = CActPerfDrumsNotation.PLAYHEAD_X - (this.stレーンサイズ[j].w / 2);
+                                num6 = CActPerfDrumsNotation.JUDGE_Y;
+                            }
                             int nRectX = 85;
                             int nRectY = 35;
 

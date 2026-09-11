@@ -1,0 +1,47 @@
+name: Build DTXManiaNX
+
+on:
+  push:
+    branches: ["**"]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Add msbuild to PATH
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Restore NuGet packages
+        run: nuget restore DTXMania.sln
+
+      - name: Build (Release, x86)
+        run: msbuild DTXMania.sln /m /p:Configuration=Release /p:Platform=x86 /verbosity:minimal
+
+      - name: Package runtime
+        shell: pwsh
+        run: |
+          $ver = if ($env:GITHUB_REF -like 'refs/tags/v*') { $env:GITHUB_REF.Substring(11) } else { 'dev-' + $env:GITHUB_SHA.Substring(0, 7) }
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          # Ship everything the game needs; leave Config.ini out so an upgrade keeps user settings
+          $exclude = @('Config.ini')
+          Get-ChildItem Runtime -Force | Where-Object { $exclude -notcontains $_.Name } | Copy-Item -Destination dist\DTXManiaNX -Recurse -Force
+          Compress-Archive -Path dist\DTXManiaNX\* -DestinationPath "dist\DTXManiaNX-$ver.zip" -Force
+          "VERSION=$ver" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: DTXManiaNX-${{ env.VERSION }}
+          path: dist/*.zip
+
+      - name: Release on tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.zip
+          generate_release_notes: true
