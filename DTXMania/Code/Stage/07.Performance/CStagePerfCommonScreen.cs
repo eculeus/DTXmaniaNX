@@ -383,6 +383,7 @@ namespace DTXMania
             this.LoopEndMs = -1;
             this.bIsTrainingMode = false;
             this.bPAUSE = false;
+            this.ctSkipDisplay = null;
 
             #region [ Sounds that should be registered in the mixer before starting playing (chip sounds that will be played immediately after the start of the performance) ]
             foreach (CChip pChip in listChip)
@@ -506,6 +507,7 @@ namespace DTXMania
                 CDTXMania.tReleaseTexture(ref this.tx判定画像anime_3);
                 CDTXMania.tReleaseTexture(ref this.txBonusEffect);
                 CDTXMania.tReleaseTexture(ref this.txPlaySpeed);
+                CDTXMania.tReleaseTexture(ref this.txSkip);
                 base.OnManagedReleaseResources();
             }
         }
@@ -859,6 +861,9 @@ namespace DTXMania
         protected CTexture txChip;  // txチップ
         protected CTexture txHitBar;  // txヒットバー
         protected CTexture txPlaySpeed;
+        protected CTexture txSkip;						// 演奏中スキップの "SKIP" 表示
+        protected CCounter ctSkipDisplay;
+        protected const int nSkipIndicatorDisplayTimeMs = 1000;
         public CTexture tx判定画像anime;     //2013.8.2 kairera0467 アニメーションの場合はあらかじめこっちで読み込む。
         public CTexture tx判定画像anime_2;   //2014.3.16 kairera0467 棒とかで必要になる。
         public CTexture tx判定画像anime_3;
@@ -2426,6 +2431,10 @@ namespace DTXMania
                     this.bIsTrainingMode = true;
                     Trace.TraceInformation("SKIP BACKWARD CSoundManager.rcPerformanceTimer.nCurrentTime=" + CSoundManager.rcPerformanceTimer.nCurrentTime + ", CDTXMania.Timer.nCurrentTime=" + CDTXMania.Timer.nCurrentTime);
                     this.tJumpInSong(Math.Max(0, CSoundManager.rcPerformanceTimer.nCurrentTime - CDTXMania.ConfigIni.nSkipTimeMs));
+                }
+                else if (!this.bPAUSE && CDTXMania.Pad.bPressed(EKeyConfigPart.SYSTEM, EKeyConfigPad.Skip))
+                {   // 演奏中のスキップ。飛ばした区間のチップはMISS扱いにするので、bIsTrainingModeは立てない(スコアは有効なまま)。
+                    this.tSkipInPlay();
                 }
                 else if (CDTXMania.Pad.bPressed(EKeyConfigPart.SYSTEM, EKeyConfigPad.LoopCreate))
                 {
@@ -5611,6 +5620,58 @@ namespace DTXMania
 
             tJumpInSong(nStartTime);
         }
+
+        /// <summary>
+        /// 演奏中のスキップ。nSkipTimeMsだけ前に飛び、飛ばした区間のチップは
+        /// 判定ラインを素通りしたときと同じように処理する(=MISS)ので、スコアは有効なまま。
+        /// </summary>
+        protected void tSkipInPlay()
+        {
+            long nOldPosition = CSoundManager.rcPerformanceTimer.nCurrentTime;
+            long nNewPosition = nOldPosition + CDTXMania.ConfigIni.nSkipTimeMs;
+
+            Trace.TraceInformation("SKIP IN PLAY CSoundManager.rcPerformanceTimer.nCurrentTime=" + nOldPosition + ", newPosition=" + nNewPosition);
+
+            // 先に判定処理を済ませてからシークする(tJumpInSong()がロングノートのキャッシュを掃除してくれるため)。
+            this.tProcessSkippedChips(nNewPosition);
+
+            this.tJumpInSong(nNewPosition);
+
+            this.tStartSkipIndicator();
+        }
+
+        /// <summary>
+        /// スキップで飛ばす区間(現在位置～nNewPositionMs)の未ヒットチップを、
+        /// 判定ラインを通過したときと同じように処理する。
+        /// AUTOのレーンは本来通りに自動演奏扱い、それ以外はMISS扱いとする。
+        /// </summary>
+        protected void tProcessSkippedChips(long nNewPositionMs)
+        {
+            List<CChip> listChipAll = CDTXMania.DTX.listChip;
+            for (int i = Math.Max(0, this.nCurrentTopChip); i < listChipAll.Count; i++)
+            {
+                CChip pChip = listChipAll[i];
+                if (pChip.nPlaybackTimeMs >= nNewPositionMs)
+                {
+                    break;
+                }
+                if (pChip.bHit || (pChip.eInstrumentPart == EInstrumentPart.UNKNOWN))
+                {
+                    continue;
+                }
+
+                if (this.bCheckAutoPlay(pChip))
+                {
+                    // AUTOのレーンはスキップしなくても自動で叩かれていたので、そのまま自動演奏扱いにする(音は鳴らさない)。
+                    this.tProcessChipHit(pChip.nPlaybackTimeMs, pChip);
+                }
+                else
+                {
+                    pChip.nLag = 0;		// tProcessChipHit()の引数最後がfalseの時はpChip.nLagを計算しないため、ここで0を代入
+                    this.tProcessChipHit(pChip.nPlaybackTimeMs, pChip, false);
+                }
+            }
+        }
         protected void tJumpInSong(long newPosition)
         {
             long nNewPosition = Math.Max(0, newPosition);
@@ -5776,6 +5837,39 @@ namespace DTXMania
                 this.txPlaySpeed = CDTXMania.tGenerateTexture(bmpModifiedPlaySpeed, false);
                 bmpModifiedPlaySpeed.Dispose();
                 pfModifiedPlaySpeed.Dispose();
+            }
+        }
+
+        /// <summary>スキップ直後に1秒だけ "SKIP" と表示するためのカウンタを開始する。</summary>
+        private void tStartSkipIndicator()
+        {
+            if (this.txSkip == null)
+            {
+                CPrivateFastFont pfSkip = new CPrivateFastFont(new FontFamily(CDTXMania.ConfigIni.str選曲リストフォント), 24, FontStyle.Bold);
+                Bitmap bmpSkip = pfSkip.DrawPrivateFont("SKIP", CPrivateFont.DrawMode.Edge, Color.White, Color.White, Color.Black, Color.Red, true);
+                this.txSkip = CDTXMania.tGenerateTexture(bmpSkip, false);
+                bmpSkip.Dispose();
+                pfSkip.Dispose();
+            }
+            this.ctSkipDisplay = new CCounter(0, nSkipIndicatorDisplayTimeMs, 1, CDTXMania.Timer);
+        }
+
+        /// <summary>スキップ直後の "SKIP" 表示。</summary>
+        protected void tUpdateAndDraw_SkipIndicator(int x, int y)
+        {
+            if ((this.ctSkipDisplay == null) || this.ctSkipDisplay.b停止中)
+            {
+                return;
+            }
+            this.ctSkipDisplay.tUpdate();
+            if (this.ctSkipDisplay.bReachedEndValue)
+            {
+                this.ctSkipDisplay.tStop();
+                return;
+            }
+            if (this.txSkip != null)
+            {
+                this.txSkip.tDraw2D(CDTXMania.app.Device, x, y);
             }
         }
 

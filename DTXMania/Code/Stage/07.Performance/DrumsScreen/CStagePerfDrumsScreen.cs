@@ -367,6 +367,7 @@ namespace DTXMania
                 this.tUpdateAndDraw_JudgementString2_ForPositionOnJudgementLine();
                 if (!bNotationView) this.tUpdateAndDraw_ChipFireD();
                 this.tUpdateAndDraw_PlaySpeed();
+                this.tUpdateAndDraw_SkipIndicator(25, 240);
                 //
                 
                 this.tUpdateAndDraw_STAGEFAILED();
