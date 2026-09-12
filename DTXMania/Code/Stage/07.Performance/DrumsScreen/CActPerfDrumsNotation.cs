@@ -93,6 +93,8 @@ namespace DTXMania
         public const int PAGE_BAR_NUMBER_DY = -179;
         public const int PAGE_HIT_ALPHA = 102;                      // 40%: played notes stay readable on the page
         public const int PAGE_RIGHT_MARGIN = 10;
+        public const int PAGE_FLASH_W = 160;                        // the hit flash is a short trail behind the
+                                                                    // playhead here, not the whole played line
         public const int PAGE_PREROLL_MS = 600;                     // run-in before a line's first bar line, so
                                                                     // the playhead arrives before the first note
         public const int PAGE_SWAP_FADE_MS = 300;                   // a staff crossfades to its next line over
@@ -198,6 +200,7 @@ namespace DTXMania
         private static bool bPage { get { return CDTXMania.ConfigIni.bDrumsNotationPage; } }
 
         private int[] nBarMs;                       // page view: bar start times ...
+        private int[] nBarPos;                      // ... their playback positions (384 per 4/4 bar) ...
         private int[] nBarNumber;                   // ... and the bar number printed at each one
         private int[] nLineMs;                      // the time each staff line starts at ...
         private int[] nLineFirstBar;                // ... and its first bar's index in nBarMs
@@ -330,7 +333,9 @@ namespace DTXMania
             }
             for (int i = 0; i < stLaneLabels.Length; i++)
             {
-                if (stLaneLabels[i].strText.Length == 0 || !bLaneIsUsed(i)) continue;
+                // every row is labelled whether or not this chart uses it: a missing RIDE or FLOOR
+                // caption reads as a bug, and the legend is a key to the staff, not to the song
+                if (stLaneLabels[i].strText.Length == 0) continue;
                 try
                 {
                     using (Bitmap bmp = this.pfLabel.DrawPrivateFont(stLaneLabels[i].strText, colLane(stLaneLabels[i].nColour), Color.Black))
@@ -342,19 +347,6 @@ namespace DTXMania
                 {
                     this.txLaneLabel[i] = null;
                 }
-            }
-        }
-
-        /// <summary>Does this chart ever use the lane? (The always-present ones just answer true.)</summary>
-        private static bool bLaneIsUsed(int nLane)
-        {
-            switch ((ELane)nLane)
-            {
-                case ELane.LC: return CDTXMania.DTX.bチップがある.LeftCymbal;
-                case ELane.LP: return CDTXMania.DTX.bチップがある.LP || CDTXMania.DTX.bチップがある.LBD;
-                case ELane.RD: return CDTXMania.DTX.bチップがある.Ride;
-                case ELane.FT: return CDTXMania.DTX.bチップがある.FT;
-                default: return true;
             }
         }
 
@@ -428,6 +420,7 @@ namespace DTXMania
         private void tBuildPageLayout()
         {
             List<int> listBarMs = new List<int>(256);
+            List<int> listBarPos = new List<int>(256);
             List<int> listBarNo = new List<int>(256);
             int nLastChipMs = 0;
             if (CDTXMania.DTX != null && CDTXMania.DTX.listChip != null)
@@ -438,10 +431,12 @@ namespace DTXMania
                     if (chip.nChannelNumber != EChannel.BarLine) continue;
                     if (listBarNo.Count > 0 && listBarNo[listBarNo.Count - 1] == chip.nPlaybackPosition / 384) continue;
                     listBarMs.Add(chip.nPlaybackTimeMs);
+                    listBarPos.Add(chip.nPlaybackPosition);
                     listBarNo.Add(chip.nPlaybackPosition / 384);
                 }
             }
             this.nBarMs = listBarMs.ToArray();
+            this.nBarPos = listBarPos.ToArray();
             this.nBarNumber = listBarNo.ToArray();
             this.nBarSearchHint = 0;
             this.nLineSearchHint = 0;
@@ -455,9 +450,13 @@ namespace DTXMania
             // the last bar runs to the last chip, so it has a width like any other
             this.nSongEndMs = (this.nBarMs.Length > 0) ? Math.Max(nLastChipMs + 1, this.nBarMs[this.nBarMs.Length - 1] + 1) : 1;
 
+            // bar 0 is the DTX lead-in and is often an odd length, so it does not get a say in how
+            // many bars a line should hold
             double dbAverageBarMs = 2000.0;     // a 4/4 bar at 120 BPM, if the chart has no bar lines
-            if (this.nBarMs.Length >= 2)
-                dbAverageBarMs = (double)(this.nBarMs[this.nBarMs.Length - 1] - this.nBarMs[0]) / (this.nBarMs.Length - 1);
+            int nFirstCounted = (this.nBarMs.Length > 2 && this.nBarNumber[0] == 0) ? 1 : 0;
+            if (this.nBarMs.Length - nFirstCounted >= 2)
+                dbAverageBarMs = (double)(this.nBarMs[this.nBarMs.Length - 1] - this.nBarMs[nFirstCounted])
+                                 / (this.nBarMs.Length - 1 - nFirstCounted);
             if (dbAverageBarMs < 100.0) dbAverageBarMs = 100.0;
 
             int nUsable = 1280 - LABEL_GUTTER_W - PAGE_RIGHT_MARGIN;
@@ -472,15 +471,34 @@ namespace DTXMania
             {
                 listLineMs.Add(this.nBarMs[i]);
                 listLineBar.Add(i);
-                // bars i..j-1 fit when bar j starts inside the room; j stops at i+1 for a bar that is
-                // wider than a whole line, which then gets a line to itself and is clipped
-                int j = i + 1;
-                while (j < this.nBarMs.Length && (this.nBarMs[j] - this.nBarMs[i]) * this.dbPxPerMs <= nBarRoom)
+                // A bar joins the line only if its END lands inside the room, so a bar is never
+                // drawn past the right edge and lines simply come out uneven. The one exception is
+                // a bar longer than a whole line: it gets a line to itself and is clipped.
+                int j = i;
+                while (j < this.nBarMs.Length && (nBarEndMs(j) - this.nBarMs[i]) * this.dbPxPerMs <= nBarRoom)
                     j++;
+                if (j == i) j = i + 1;
                 i = j;
             }
             this.nLineMs = listLineMs.ToArray();
             this.nLineFirstBar = listLineBar.ToArray();
+
+            // every bar must belong to exactly one line: a gap here is a bar the player never sees
+            for (int k = 0; k + 1 < this.nLineFirstBar.Length; k++)
+            {
+                int nNextExpected = this.nLineFirstBar[k + 1];
+                if (nNextExpected <= this.nLineFirstBar[k])
+                    System.Diagnostics.Trace.TraceWarning("Notation page: line {0} does not advance (bar {1}).", k, nNextExpected);
+            }
+            if (this.nLineFirstBar.Length > 0 && this.nLineFirstBar[0] != 0)
+                System.Diagnostics.Trace.TraceWarning("Notation page: the first line starts at bar index {0}, not 0.", this.nLineFirstBar[0]);
+        }
+
+        /// <summary>When a bar ends: the next bar line, or the end of the song for the last one.</summary>
+        private long nBarEndMs(int nBar)
+        {
+            if (this.nBarMs == null || nBar < 0) return 0;
+            return (nBar + 1 < this.nBarMs.Length) ? this.nBarMs[nBar + 1] : this.nSongEndMs;
         }
 
         /// <summary>Which line is on screen: a line owns the time from its own pre-roll to the next line's.</summary>
@@ -589,14 +607,20 @@ namespace DTXMania
                 if (bDrawGrid) tDrawCell(SHAPE_SOLID, C_WHITE, x - 1, nStaffTop, 2, nStaffH, 230);
                 if (b == nLast) break;                      // the next line's first bar closes this one
                 // the console font has no alpha, so the numbers change over at the half way point
-                if (nAlphaScale >= 128)
+                if (nAlphaScale >= 128 && this.nBarNumber[b] != 0)   // bar 0 is the lead-in: no number
                     CDTXMania.actDisplayString.tPrint(x + 4, this.nBaseY + PAGE_BAR_NUMBER_DY,
                                                       CCharacterConsole.EFontType.White, this.nBarNumber[b].ToString());
                 if (!bDrawGrid) continue;
-                long nBarEnd = (b + 1 < this.nBarMs.Length) ? this.nBarMs[b + 1] : this.nSongEndMs;
-                for (int q = 1; q < 4; q++)
+                long nBarEnd = nBarEndMs(b);
+                // how many beats this bar really has: a 1-beat pickup gets no interior tick, a 3/4
+                // bar gets two, instead of always quartering whatever the bar happens to be
+                int nBeats = 4;
+                if (b + 1 < this.nBarPos.Length)
+                    nBeats = (this.nBarPos[b + 1] - this.nBarPos[b]) / 96;
+                if (nBeats < 1) nBeats = 1;
+                for (int q = 1; q < nBeats; q++)
                 {
-                    int xq = nPageX(this.nBarMs[b] + (nBarEnd - this.nBarMs[b]) * q / 4.0, nOrigin);
+                    int xq = nPageX(this.nBarMs[b] + (nBarEnd - this.nBarMs[b]) * q / (double)nBeats, nOrigin);
                     if (xq <= nRight) tDrawCell(SHAPE_SOLID, C_WHITE, xq, nStaffTop, 1, nStaffH, 70);
                 }
             }
@@ -675,8 +699,11 @@ namespace DTXMania
                 int y = nBaseY - (i + POS_MIN) * nStep;
                 int nColour = this.nLaneFlashColour[i];
                 int nGlowW = nSc(LANE_GLOW_W);
-                tDrawCell(SHAPE_SOLID, nColour, LABEL_GUTTER_W, y - nStep,
-                          nHeadX - LABEL_GUTTER_W, nSpace, (int)(LANE_FLASH_ALPHA * dbFade));
+                // scroll mode lights the whole played region; on a page that would be most of the
+                // line, so it is a short trail behind the playhead instead
+                int nFlashLeft = bPage ? Math.Max(LABEL_GUTTER_W, nHeadX - PAGE_FLASH_W) : LABEL_GUTTER_W;
+                tDrawCell(SHAPE_SOLID, nColour, nFlashLeft, y - nStep,
+                          nHeadX - nFlashLeft, nSpace, (int)(LANE_FLASH_ALPHA * dbFade));
                 tDrawCell(SHAPE_HEAD, nColour, nHeadX - nGlowW / 2, y - nGlowW / 2,
                           nGlowW, nGlowW, (int)(LANE_GLOW_ALPHA * dbFade));
             }
