@@ -1,3 +1,12 @@
+## About this fork (eculeus)
+This fork adds a **sheet-music notation view for drums** (scrolling or two-line page layout, with
+standard notation positions, colours per instrument and beams), an in-play **Skip key** that
+keeps the score valid, **named multi-player high scores** shown on the result and song-select
+screens, and two crash fixes. All of it is optional and off by default, so an upstream
+`Config.ini` keeps working. Details and per-version notes are in [CHANGELOG.md](CHANGELOG.md);
+builds are on the [releases page](https://github.com/eculeus/DTXmaniaNX/releases) and as
+artifacts of every GitHub Actions run.
+
 ## What is DTXManiaNX?
 DTXManiaNX is a program that replicates gameplay from Konami's music video game, Gitadora - Drummania/GuitarFreaks. This project was forked from the DTXManiaXG verK SVN repository. It processes DTX files (including older formats such as BMS/BME or GDA/G2D) and allows playing of custom created charts with a use of a game, keyboard or MIDI controller.
 
