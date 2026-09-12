@@ -146,7 +146,31 @@ namespace DTXMania
                     this.n難易度開始文字位置 = 0;
                 }
                 this.r直前の曲 = c曲リストノード;
+
+                this.tSelectedSongHighScoreHolderChanged(cスコア);
             }
+        }
+
+        /// <summary>
+        /// 選択中の譜面の scores.ini を読み、ドラムの1位の名前を控えておく。
+        /// </summary>
+        private void tSelectedSongHighScoreHolderChanged(CScore cスコア)
+        {
+            string strBestPlayerName旧 = this.strBestPlayerName;
+            this.strBestPlayerName = "";
+
+            if ((cスコア != null) && CDTXMania.ConfigIni.bDrumsEnabled)
+            {
+                List<CHighScores.CEntry> listEntries = CHighScores.tLoad(
+                    CHighScores.strFilePath(cスコア.FileInformation.AbsoluteFilePath)).listEntries(
+                    EInstrumentPart.DRUMS, this.n現在選択中の曲の難易度);
+
+                if (listEntries.Count > 0)
+                    this.strBestPlayerName = listEntries[0].strName;
+            }
+
+            if (strBestPlayerName旧 != this.strBestPlayerName)
+                this.bBestPlayerNameの再生成が必要 = true;
         }
 
 
@@ -207,6 +231,8 @@ namespace DTXMania
                 this.txDrumsGraphPanel = CDTXMania.tGenerateTexture(CSkin.Path(@"Graphics\5_graph panel drums.png"));
                 this.txGuitarBassGraphPanel = CDTXMania.tGenerateTexture(CSkin.Path(@"Graphics\5_graph panel guitar bass.png"));
                 this.txSkillPointPanel = CDTXMania.tGenerateTexture(CSkin.Path(@"Graphics\5_skill point panel.png"));
+                this.prvfBestPlayerName = new CPrivateFastFont(new FontFamily(CDTXMania.ConfigIni.str選曲リストフォント), 11, FontStyle.Regular);
+                this.bBestPlayerNameの再生成が必要 = true;
                 txGenerateGraphBarLine();
                 txGenerateProgressBarLine("");
                 base.OnManagedCreateResources();
@@ -236,6 +262,8 @@ namespace DTXMania
                 }
                 CDTXMania.tReleaseTexture(ref this.txSkillPointPanel);
                 CDTXMania.tReleaseTexture(ref this.txProgressBar);
+                CDTXMania.tReleaseTexture(ref this.txBestPlayerName);
+                CDTXMania.t安全にDisposeする(ref this.prvfBestPlayerName);
                 base.OnManagedReleaseResources();
             }
         }
@@ -581,6 +609,11 @@ namespace DTXMania
                                     }
                                 }
                                 #endregion
+
+                                #region [ 選択曲の 名前つきハイスコア1位の描画 ]
+                                if ((j == 0) && (this.n現在選択中の曲の難易度 == i))
+                                    this.tDrawBestPlayerName(nBoxX + 80, nBoxY + 1);
+                                #endregion
                                 db変数 = this.db現在選択中の曲の最高スキル値難易度毎[i][j];
 
                                 if (db変数 < 0)
@@ -657,6 +690,11 @@ namespace DTXMania
                                     this.tDrawDifficulty(nBoxX + nPanelW - 77, nBoxY + nPanelH - 35, ("-.--"));
                                 }
                             }
+                            #endregion
+
+                            #region [ 選択曲の 名前つきハイスコア1位の描画 ]
+                            if (j == 0)
+                                this.tDrawBestPlayerName(nBoxX + 80, nBoxY + 1);
                             #endregion
                             db変数 = this.db現在選択中の曲の最高スキル値[j];
 
@@ -835,6 +873,40 @@ namespace DTXMania
         };
          */
         private CSongListNode r直前の曲;
+
+        #region [ 名前つきハイスコア (scores.ini) の1位表示 ]
+        private const int nBestPlayerNameの最大幅 = 120;
+        private bool bBestPlayerNameの再生成が必要 = true;
+        private string strBestPlayerName = "";
+        private CPrivateFastFont prvfBestPlayerName;
+        private CTexture txBestPlayerName;
+
+        /// <summary>
+        /// 選択中の難易度のドラム1位の名前を "BEST: NAME" の形で描画する。記録が無ければ何も描画しない。
+        /// </summary>
+        private void tDrawBestPlayerName(int x, int y)
+        {
+            if (this.bBestPlayerNameの再生成が必要)
+            {
+                CDTXMania.tReleaseTexture(ref this.txBestPlayerName);
+
+                if ((this.prvfBestPlayerName != null) && (this.strBestPlayerName.Length > 0))
+                {
+                    using (Bitmap bitmap = this.prvfBestPlayerName.DrawPrivateFont("BEST: " + this.strBestPlayerName, Color.White, Color.Black))
+                    {
+                        this.txBestPlayerName = CDTXMania.tGenerateTexture(bitmap, false);
+                    }
+                    if ((this.txBestPlayerName != null) && (this.txBestPlayerName.szImageSize.Width > nBestPlayerNameの最大幅))
+                        this.txBestPlayerName.vcScaleRatio.X = ((float)nBestPlayerNameの最大幅) / this.txBestPlayerName.szImageSize.Width;
+                }
+                this.bBestPlayerNameの再生成が必要 = false;
+            }
+
+            if (this.txBestPlayerName != null)
+                this.txBestPlayerName.tDraw2D(CDTXMania.app.Device, x, y);
+        }
+        #endregion
+
         public string[] str難易度ラベル = new string[] { "", "", "", "", "" };
         
         private readonly ST数字[] st数字 = new ST数字[]

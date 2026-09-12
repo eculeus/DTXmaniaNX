@@ -180,6 +180,7 @@
     <Compile Include="Code\Item\CItemToggle.cs" />
     <Compile Include="Code\Score,Song\CBoxDef.cs" />
     <Compile Include="Code\Score,Song\CDTX.cs" />
+    <Compile Include="Code\Score,Song\CHighScores.cs" />
     <Compile Include="Code\Score,Song\CScoreIni.cs" />
     <Compile Include="Code\Score,Song\CSetDef.cs" />
     <Compile Include="Code\Stage\02.Title\CEnumSongs.cs" />
@@ -252,7 +253,9 @@
     <Compile Include="Code\Stage\07.Performance\DrumsScreen\CActPerfDrumsLaneFlushGB.cs" />
     <Compile Include="Code\Stage\07.Performance\DrumsScreen\CActPerfDrumsJudgementString.cs" />
     <Compile Include="Code\Stage\07.Performance\DrumsScreen\CStagePerfDrumsScreen.cs" />
+    <Compile Include="Code\Stage\08.Result\CActResultHighScorePanel.cs" />
     <Compile Include="Code\Stage\08.Result\CActResultImage.cs" />
+    <Compile Include="Code\Stage\08.Result\CActResultNameEntry.cs" />
     <Compile Include="Code\Stage\08.Result\CActResultParameterPanel.cs" />
     <Compile Include="Code\Stage\08.Result\CActResultRank.cs" />
     <Compile Include="Code\Stage\08.Result\CActResultSongBar.cs" />
