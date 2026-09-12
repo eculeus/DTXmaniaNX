@@ -32,9 +32,10 @@ namespace DTXMania
         public const int STAFF_TOP_Y = STAFF_BOTTOM_Y - 4 * STAFF_SPACE;    // 100
         public const int BAND_TOP_Y = 12;                           // dark backing strip
         public const int BAND_BOTTOM_Y = 250;                       // ...238 px tall
-        public const int STEM_TOP_Y = 36;                           // every up-stem ends here (and beams sit here)
+        public const int STEM_TOP_Y = STAFF_BOTTOM_Y - 132;         // up-stems end here (3.5 spaces over the snare),
+                                                                    // and the beams sit on that line
         public const int STEM_BOTTOM_Y = STAFF_BOTTOM_Y + 55;       // every down-stem ends here
-        public const int BAR_NUMBER_Y = 16;                         // bar number text, inside the band top
+        public const int BAR_NUMBER_Y = 14;                         // bar number text, inside the band top
         public const double X_SCALE = 1.55;                         // horizontal px per vertical-lane px
                                                                     // (chips stop being fed to us past 600 px,
                                                                     //  320 + 600*1.55 = 1250, i.e. just off-screen)
@@ -68,8 +69,10 @@ namespace DTXMania
         private const int LINE_H = 2;               // staff line thickness
         private const int BAR_LINE_LEAD = 13;       // bar / beat lines are drawn this far left of the
                                                     // notes on that beat, so they never run through a head
-        private const int BEAM_H = 5;
-        private const int BEAM_GAP = 8;
+        private const int HEAD_CLEAR = 22;          // a note sitting above STEM_TOP_Y (the left crash on its
+                                                    // second ledger line) pushes its own stem up by this much
+        private const int BEAM_H = 4;
+        private const int BEAM_GAP = 7;
         private const bool BEAMS = true;            // join notes of the same beat with a beam
 
         // Sprite sheet: 5 shape columns x 13 colour rows of 32x32 cells.
@@ -161,9 +164,9 @@ namespace DTXMania
         {
             this.listNotes.Clear();
             if (this.tx == null) return;
-            tDrawCell(SHAPE_SOLID, C_DARK, 0, BAND_TOP_Y, 1280, BAND_BOTTOM_Y - BAND_TOP_Y, 170);
+            tDrawCell(SHAPE_SOLID, C_DARK, 0, BAND_TOP_Y, 1280, BAND_BOTTOM_Y - BAND_TOP_Y, 200);
             for (int i = 0; i < 5; i++)
-                tDrawCell(SHAPE_SOLID, C_WHITE, 0, STAFF_BOTTOM_Y - i * STAFF_SPACE - LINE_H / 2, 1280, LINE_H, 210);
+                tDrawCell(SHAPE_SOLID, C_WHITE, 0, STAFF_BOTTOM_Y - i * STAFF_SPACE - LINE_H / 2, 1280, LINE_H, 235);
             tDrawCell(SHAPE_SOLID, C_PLAYHEAD, PLAYHEAD_X - 2, BAND_TOP_Y + 8, 4, BAND_BOTTOM_Y - BAND_TOP_Y - 16, 255);
         }
 
@@ -236,7 +239,10 @@ namespace DTXMania
 
                 // one stem up for the hands, one stem down for the feet, never crossing a head
                 if (nUpBottom != int.MinValue)
-                    tDrawCell(SHAPE_SOLID, C_WHITE, x + STEM_DX, STEM_TOP_Y, STEM_W, nUpBottom - STEM_TOP_Y, nUpAlpha);
+                {
+                    int nStemTop = Math.Min(STEM_TOP_Y, nUpTop - HEAD_CLEAR);
+                    tDrawCell(SHAPE_SOLID, C_WHITE, x + STEM_DX, nStemTop, STEM_W, nUpBottom - nStemTop, nUpAlpha);
+                }
                 if (nDownTop != int.MaxValue)
                     tDrawCell(SHAPE_SOLID, C_WHITE, x - STEM_DX - STEM_W, nDownTop, STEM_W, STEM_BOTTOM_Y - nDownTop, nDownAlpha);
 
