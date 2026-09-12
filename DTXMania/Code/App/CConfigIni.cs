@@ -673,8 +673,11 @@ namespace DTXMania
 		public bool bLogSongSearch;
 		public bool bLog作成解放ログ出力;
 		public STDGBVALUE<bool> bReverse;
-		public bool bDrumsNotationView;   // horizontal sheet-music view for the drums screen
+		public int nDrumsNotationView;    // sheet-music view for the drums screen: 0 off, 1 scroll, 2 page
+		public bool bDrumsNotationView { get { return this.nDrumsNotationView > 0; } }
+		public bool bDrumsNotationPage { get { return this.nDrumsNotationView == 2; } }
 		public bool bDrumsNotationStems;  // ...with note stems and beams (off: noteheads only)
+		public int nDrumsNotationBarsPerLine;   // page view: bars per staff line (ini only, 1-8)
 		public bool bScoreIniを出力する;
 		public bool bSTAGEFAILEDEnabled;
 		public STDGBVALUE<bool> bSudden;
@@ -1393,8 +1396,9 @@ namespace DTXMania
 			this.bSudden = new STDGBVALUE<bool>();
 			this.bHidden = new STDGBVALUE<bool>();
 			this.bReverse = new STDGBVALUE<bool>();
-			this.bDrumsNotationView = false;
+			this.nDrumsNotationView = 0;
 			this.bDrumsNotationStems = true;
+			this.nDrumsNotationBarsPerLine = 4;
 			this.eRandom = new STDGBVALUE<ERandomMode>();
 			this.bLight = new STDGBVALUE<bool>();
 			this.bSpecialist = new STDGBVALUE<bool>();
@@ -2062,10 +2066,12 @@ namespace DTXMania
 			sw.WriteLine( "GuitarReverse={0}", this.bReverse.Guitar ? 1 : 0 );
 			sw.WriteLine( "BassReverse={0}", this.bReverse.Bass ? 1 : 0 );
 			sw.WriteLine();
-			sw.WriteLine( "; Drums notation view: 1 = show the chart as scrolling sheet music instead of lanes" );
-			sw.WriteLine( "DrumsNotationView={0}", this.bDrumsNotationView ? 1 : 0 );
+			sw.WriteLine( "; Drums notation view: 0 = vertical lanes, 1 = scrolling staff, 2 = page turn" );
+			sw.WriteLine( "DrumsNotationView={0}", this.nDrumsNotationView );
 			sw.WriteLine( "; Drums notation view: 1 = draw note stems and beams as well as the noteheads" );
 			sw.WriteLine( "DrumsNotationStems={0}", this.bDrumsNotationStems ? 1 : 0 );
+			sw.WriteLine( "; Drums notation page view: how many bars fit on one staff line (1-8)" );
+			sw.WriteLine( "DrumsNotationBarsPerLine={0}", this.nDrumsNotationBarsPerLine );
 			sw.WriteLine();
 			sw.WriteLine( "; ギター/ベースRANDOMモード(0:OFF, 1:Mirror, 2:Random, 3:SuperRandom, 4:HyperRandom)" );
 			sw.WriteLine( "GuitarRandom={0}", (int) this.eRandom.Guitar );
@@ -3269,7 +3275,12 @@ namespace DTXMania
 											}
 											else if ( str3.Equals( "DrumsNotationView" ) )
 											{
-												this.bDrumsNotationView = CConversion.bONorOFF( str4[ 0 ] );
+												// 0/1 keep meaning off/scroll, so files written before the page view still work
+												this.nDrumsNotationView = CConversion.nGetNumberIfInRange( str4, 0, 2, this.nDrumsNotationView );
+											}
+											else if ( str3.Equals( "DrumsNotationBarsPerLine" ) )
+											{
+												this.nDrumsNotationBarsPerLine = CConversion.nGetNumberIfInRange( str4, 1, 8, this.nDrumsNotationBarsPerLine );
 											}
 											else if ( str3.Equals( "DrumsNotationStems" ) )
 											{

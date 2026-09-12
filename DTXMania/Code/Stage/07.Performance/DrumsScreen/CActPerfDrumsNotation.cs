@@ -79,7 +79,23 @@ namespace DTXMania
 
         // The judgement popup is drawn at the playhead, at the staff height of the lane it judges, so
         // it reads as belonging to that note. Small, and lifted clear of the head it belongs to.
-        public const int JUDGE_X = PLAYHEAD_X;                      // judgement popup anchor
+        // ------------------------------------------------------------------ //
+        //  Page view (DrumsNotationView=2): two fixed staves inside the same  //
+        //  band. Notes do not move; a playhead sweeps across the top one, and //
+        //  when it reaches the end the lower line becomes the upper one.      //
+        // ------------------------------------------------------------------ //
+        public const int PAGE_SPACE = 24;                           // staff spacing in page mode; two systems of
+                                                                    // 225 px have to fit in the 470 px band
+        public const int PAGE_SYSTEM_DY = 225;                      // bottom line of one system to the next
+        public const int PAGE_BOTTOM_0 = 185;                       // bottom line of the upper system
+        public const int PAGE_STEM_TOP_DY = -167;                   // beam line, relative to a system's bottom line
+        public const int PAGE_STEM_BOTTOM_DY = 40;
+        public const int PAGE_BAR_NUMBER_DY = -179;
+        public const int PAGE_HIT_ALPHA = 102;                      // 40%: played notes stay readable on the page
+        public const int PAGE_RIGHT_MARGIN = 10;
+        public const int PAGE_NOTE_INSET = 14;                      // gap between a bar line and its downbeat
+
+        public const int JUDGE_X = PLAYHEAD_X;                      // judgement popup anchor in scroll mode
         public const int JUDGE_GAP = 12;                            // its right edge sits this far left of the
                                                                     // playhead, in the region already played
         public const int JUDGE_RISE = 26;                           // its bottom edge sits this far over the head
@@ -146,6 +162,43 @@ namespace DTXMania
                                             //   one ledger line apart and would otherwise be two yellow x heads
 
         private CTexture tx;
+
+        // Geometry of the system currently being laid out. Scroll mode has one system and these
+        // hold the scroll-mode constants, so that path is unchanged; page mode sets them per staff.
+        private int nBaseY = STAFF_BOTTOM_Y;        // y of this system's bottom staff line
+        private int nSpace = STAFF_SPACE;           // staff spacing
+        private int nStep = STAFF_STEP;             // half of it, one staff position
+        private int nStemTopY = STEM_TOP_Y;         // beam line
+        private int nStemBotY = STEM_BOTTOM_Y;
+        private int nHeadX = PLAYHEAD_X;            // where the playhead is right now
+
+        // The judgement string and the lane flash need these from outside, once per frame.
+        private static int nActiveBaseY = STAFF_BOTTOM_Y;
+        private static int nActiveStep = STAFF_STEP;
+        private static int nActiveJudgeX = JUDGE_X;
+
+        /// <summary>Point the layout at one staff system.</summary>
+        private void tSetSystem(int nBottomY, int nSpacing, int nStemTop, int nStemBottom)
+        {
+            this.nBaseY = nBottomY;
+            this.nSpace = nSpacing;
+            this.nStep = nSpacing / 2;
+            this.nStemTopY = nStemTop;
+            this.nStemBotY = nStemBottom;
+        }
+
+        /// <summary>Scale a scroll-mode pixel size to the spacing of the current system.</summary>
+        private int nSc(int nValue)
+        {
+            int n = nValue * this.nSpace / STAFF_SPACE;
+            return (n < 1) ? 1 : n;
+        }
+
+        private static bool bPage { get { return CDTXMania.ConfigIni.bDrumsNotationPage; } }
+
+        private int[] nBarTimeMs;                   // page view tempo map: bar-line times ...
+        private int[] nBarPos;                      // ... and their playback positions
+        private int nBarSearchHint;
 
         /// <summary>One drum voice: where it sits on the staff, how it is drawn and in which lane colour.</summary>
         private struct STNote
@@ -228,6 +281,7 @@ namespace DTXMania
             if (!base.bNotActivated)
             {
                 this.tx = CDTXMania.tGenerateTexture(CSkin.Path(@"Graphics\7_notation.png"));
+                this.nBarTimeMs = null;         // rebuilt for this song on the first page-mode frame
                 tCreateLaneLabels();
                 base.OnManagedCreateResources();
             }
@@ -319,10 +373,13 @@ namespace DTXMania
         }
 
         /// <summary>Staff y of a lane (ELane 0..9), i.e. the height its noteheads are drawn at.</summary>
+        /// <summary>Where the judgement popup is anchored: the playhead, wherever it is this frame.</summary>
+        public static int nJudgeX { get { return nActiveJudgeX; } }
+
         public static int nLaneY(int nLane)
         {
-            if (nLane < 0 || nLane >= stLaneLabels.Length) return STAFF_BOTTOM_Y - 5 * STAFF_STEP;
-            return STAFF_BOTTOM_Y - stLaneLabels[nLane].nPos * STAFF_STEP;
+            if (nLane < 0 || nLane >= stLaneLabels.Length) return nActiveBaseY - 5 * nActiveStep;
+            return nActiveBaseY - stLaneLabels[nLane].nPos * nActiveStep;
         }
 
         /// <summary>Screen x for a chip given its (vertical-lane) distance from the judgement line.</summary>
@@ -336,6 +393,12 @@ namespace DTXMania
         {
             this.listNotes.Clear();
             if (this.tx == null) return;
+            if (bPage) { tDrawPage(); return; }
+            tSetSystem(STAFF_BOTTOM_Y, STAFF_SPACE, STEM_TOP_Y, STEM_BOTTOM_Y);
+            this.nHeadX = PLAYHEAD_X;
+            nActiveBaseY = STAFF_BOTTOM_Y;
+            nActiveStep = STAFF_STEP;
+            nActiveJudgeX = JUDGE_X;
             tDrawCell(SHAPE_SOLID, C_DARK, 0, BAND_TOP_Y, 1280, BAND_BOTTOM_Y - BAND_TOP_Y, 200);
             tDrawCell(SHAPE_SOLID, C_DARK, 0, BAND_TOP_Y, LABEL_GUTTER_W, BAND_BOTTOM_Y - BAND_TOP_Y, 190);
             tDrawLaneFlashes();
@@ -345,6 +408,142 @@ namespace DTXMania
                           1280 - LABEL_GUTTER_W, LINE_H, 235);
             tDrawCell(SHAPE_SOLID, C_PLAYHEAD, PLAYHEAD_X - 2, BAND_TOP_Y + 8, 4, BAND_BOTTOM_Y - BAND_TOP_Y - 16, 255);
         }
+
+        #region [ page view: two fixed staves, a playhead sweeping across the upper one ]
+
+        /// <summary>
+        /// Where the song is now, in playback-position units (384 per bar). Interpolated between
+        /// the bar-line chips, which carry both a time and a position, so a tempo change simply
+        /// changes how fast the playhead crosses that bar.
+        /// </summary>
+        private double dbPlaybackPosition()
+        {
+            if (this.nBarTimeMs == null || this.nBarTimeMs.Length < 2) return 0.0;
+
+            long nNow = CSoundManager.rcPerformanceTimer.nCurrentTime;
+            int n = this.nBarSearchHint;
+            if (n < 0 || n > this.nBarTimeMs.Length - 2) n = 0;
+            while (n > 0 && nNow < this.nBarTimeMs[n]) n--;
+            while (n < this.nBarTimeMs.Length - 2 && nNow >= this.nBarTimeMs[n + 1]) n++;
+            this.nBarSearchHint = n;
+
+            long nSpan = this.nBarTimeMs[n + 1] - this.nBarTimeMs[n];
+            if (nSpan <= 0) return this.nBarPos[n];
+            double dbFraction = (double)(nNow - this.nBarTimeMs[n]) / nSpan;     // may be <0 or >1 at the ends
+            return this.nBarPos[n] + dbFraction * (this.nBarPos[n + 1] - this.nBarPos[n]);
+        }
+
+        /// <summary>Bar line chips carry both a time and a 384-per-bar position: that is our tempo map.</summary>
+        private void tBuildBarMap()
+        {
+            List<int> listMs = new List<int>(256);
+            List<int> listPos = new List<int>(256);
+            if (CDTXMania.DTX != null && CDTXMania.DTX.listChip != null)
+            {
+                foreach (CChip chip in CDTXMania.DTX.listChip)
+                {
+                    if (chip.nChannelNumber != EChannel.BarLine) continue;
+                    if (listPos.Count > 0 && listPos[listPos.Count - 1] == chip.nPlaybackPosition) continue;
+                    listMs.Add(chip.nPlaybackTimeMs);
+                    listPos.Add(chip.nPlaybackPosition);
+                }
+            }
+            this.nBarTimeMs = listMs.ToArray();
+            this.nBarPos = listPos.ToArray();
+            this.nBarSearchHint = 0;
+        }
+
+        /// <summary>x of a position inside the current line. Notes are inset so a downbeat does not sit on the bar line.</summary>
+        private static int nPageX(double dbTicksIntoLine, int nTicksPerLine)
+        {
+            int nWidth = 1280 - LABEL_GUTTER_W - PAGE_RIGHT_MARGIN - PAGE_NOTE_INSET;
+            return LABEL_GUTTER_W + PAGE_NOTE_INSET + (int)(dbTicksIntoLine * nWidth / nTicksPerLine);
+        }
+
+        /// <summary>The whole page: band, two systems, their bars and notes, the legend and the playhead.</summary>
+        private void tDrawPage()
+        {
+            if (this.nBarTimeMs == null) tBuildBarMap();
+
+            int nBars = CDTXMania.ConfigIni.nDrumsNotationBarsPerLine;
+            if (nBars < 1 || nBars > 8) nBars = 4;
+            int nTicksPerLine = nBars * 384;
+
+            double dbPos = dbPlaybackPosition();
+            if (dbPos < 0.0) dbPos = 0.0;
+            int nLine = (int)(dbPos / nTicksPerLine);
+            this.nHeadX = nPageX(dbPos - (double)nLine * nTicksPerLine, nTicksPerLine);
+
+            nActiveBaseY = PAGE_BOTTOM_0;
+            nActiveStep = PAGE_SPACE / 2;
+            nActiveJudgeX = this.nHeadX;
+
+            tDrawCell(SHAPE_SOLID, C_DARK, 0, BAND_TOP_Y, 1280, BAND_BOTTOM_Y - BAND_TOP_Y, 200);
+            tDrawCell(SHAPE_SOLID, C_DARK, 0, BAND_TOP_Y, LABEL_GUTTER_W, BAND_BOTTOM_Y - BAND_TOP_Y, 190);
+
+            for (int k = 0; k < 2; k++)
+            {
+                int nBottom = PAGE_BOTTOM_0 + k * PAGE_SYSTEM_DY;
+                tSetSystem(nBottom, PAGE_SPACE, nBottom + PAGE_STEM_TOP_DY, nBottom + PAGE_STEM_BOTTOM_DY);
+                if (k == 0) tDrawLaneFlashes();             // the flash belongs to the line being played
+                for (int i = 0; i < 5; i++)
+                    tDrawCell(SHAPE_SOLID, C_WHITE, LABEL_GUTTER_W, nBottom - i * PAGE_SPACE - nSc(LINE_H) / 2,
+                              1280 - LABEL_GUTTER_W - PAGE_RIGHT_MARGIN, nSc(LINE_H), 235);
+                tDrawPageLine(nLine + k, nBars, nTicksPerLine);
+                tDrawLaneLabels();
+            }
+
+            // the playhead sweeps the upper system only
+            tDrawCell(SHAPE_SOLID, C_PLAYHEAD, this.nHeadX - 2, PAGE_BOTTOM_0 + PAGE_STEM_TOP_DY - 12, 4,
+                      PAGE_STEM_BOTTOM_DY - PAGE_STEM_TOP_DY + 12, 255);
+        }
+
+        /// <summary>One staff line of the page: its bars, beat ticks, bar numbers and notes.</summary>
+        private void tDrawPageLine(int nLineIndex, int nBars, int nTicksPerLine)
+        {
+            if (nLineIndex < 0) return;
+            int nStartPos = nLineIndex * nTicksPerLine;
+            int nStaffH = 4 * this.nSpace + 1;
+            int nStaffTop = this.nBaseY - 4 * this.nSpace;
+
+            for (int b = 0; b <= nBars; b++)
+            {
+                int x = nPageX(b * 384, nTicksPerLine) - PAGE_NOTE_INSET;
+                tDrawCell(SHAPE_SOLID, C_WHITE, x - 1, nStaffTop, 2, nStaffH, 230);
+                if (b == nBars) break;
+                CDTXMania.actDisplayString.tPrint(x + 4, this.nBaseY + PAGE_BAR_NUMBER_DY,
+                                                  CCharacterConsole.EFontType.White, (nLineIndex * nBars + b).ToString());
+                for (int q = 1; q < 4; q++)
+                    tDrawCell(SHAPE_SOLID, C_WHITE, nPageX(b * 384 + q * 96, nTicksPerLine) - PAGE_NOTE_INSET,
+                              nStaffTop, 1, nStaffH, 70);
+            }
+
+            // the page is laid out by bar, so the chips come straight from the chart, not from the
+            // engine's time-based feed
+            this.listNotes.Clear();
+            List<CChip> listChip = (CDTXMania.DTX != null) ? CDTXMania.DTX.listChip : null;
+            if (listChip == null) return;
+            int nEndPos = nStartPos + nTicksPerLine;
+            for (int i = 0; i < listChip.Count; i++)
+            {
+                CChip chip = listChip[i];
+                if (chip.nPlaybackPosition >= nEndPos) break;        // listChip is sorted by position
+                if (chip.nPlaybackPosition < nStartPos) continue;
+                STNote note;
+                if (!mapNotes.TryGetValue(chip.nChannelNumber, out note)) continue;
+
+                STPendingNote pending;
+                pending.x = nPageX(chip.nPlaybackPosition - nStartPos, nTicksPerLine);
+                pending.nPlaybackPosition = chip.nPlaybackPosition;
+                pending.nAlpha = chip.bHit ? PAGE_HIT_ALPHA : 255;
+                pending.note = note;
+                this.listNotes.Add(pending);
+            }
+            tLayoutNotes();
+            this.listNotes.Clear();
+        }
+
+        #endregion
 
         /// <summary>
         /// The stage calls this from the same place the vertical view starts its lane flush, so the
@@ -385,12 +584,13 @@ namespace DTXMania
                 if (ct.bReachedEndValue) { ct.tStop(); continue; }
 
                 double dbFade = 1.0 - (double)ct.nCurrentValue / LANE_FLASH_MS;
-                int y = STAFF_BOTTOM_Y - (i + POS_MIN) * STAFF_STEP;
+                int y = nBaseY - (i + POS_MIN) * nStep;
                 int nColour = this.nLaneFlashColour[i];
-                tDrawCell(SHAPE_SOLID, nColour, LABEL_GUTTER_W, y - STAFF_STEP,
-                          PLAYHEAD_X - LABEL_GUTTER_W, STAFF_SPACE, (int)(LANE_FLASH_ALPHA * dbFade));
-                tDrawCell(SHAPE_HEAD, nColour, PLAYHEAD_X - LANE_GLOW_W / 2, y - LANE_GLOW_W / 2,
-                          LANE_GLOW_W, LANE_GLOW_W, (int)(LANE_GLOW_ALPHA * dbFade));
+                int nGlowW = nSc(LANE_GLOW_W);
+                tDrawCell(SHAPE_SOLID, nColour, LABEL_GUTTER_W, y - nStep,
+                          nHeadX - LABEL_GUTTER_W, nSpace, (int)(LANE_FLASH_ALPHA * dbFade));
+                tDrawCell(SHAPE_HEAD, nColour, nHeadX - nGlowW / 2, y - nGlowW / 2,
+                          nGlowW, nGlowW, (int)(LANE_GLOW_ALPHA * dbFade));
             }
         }
 
@@ -405,7 +605,7 @@ namespace DTXMania
             {
                 CTexture txLabel = this.txLaneLabel[i];
                 if (txLabel == null) continue;
-                int y = STAFF_BOTTOM_Y - stLaneLabels[i].nPos * STAFF_STEP;
+                int y = nBaseY - stLaneLabels[i].nPos * nStep;
                 txLabel.nTransparency = 255;
                 int nLabelX = LABEL_GUTTER_W - LABEL_RIGHT_PAD - txLabel.szImageSize.Width;
                 if (nLabelX < 2) nLabelX = 2;
@@ -416,7 +616,7 @@ namespace DTXMania
         /// <summary>Remember one chip; the heads and stems are drawn together in tDrawNotes().</summary>
         public void tDrawChip(CChip pChip)
         {
-            if (this.tx == null) return;
+            if (this.tx == null || bPage) return;
             STNote note;
             if (!mapNotes.TryGetValue(pChip.nChannelNumber, out note)) return;
             int x = nX(pChip.nDistanceFromBar.Drums);
@@ -437,8 +637,18 @@ namespace DTXMania
         /// </summary>
         public void tDrawNotes()
         {
-            if (this.tx == null) return;
-            if (this.listNotes.Count == 0) { tDrawLaneLabels(); return; }
+            if (this.tx == null || bPage) return;   // page mode draws everything from tDrawStaff()
+            tLayoutNotes();
+            tDrawLaneLabels();
+        }
+
+        /// <summary>
+        /// Lay out whatever is in listNotes on the current system: ledger lines, one shared up-stem
+        /// for the hands, one shared down-stem for the feet, the beams, then the heads on top.
+        /// </summary>
+        private void tLayoutNotes()
+        {
+            if (this.listNotes.Count == 0) return;
 
             int nFrom = 0;
             int nBeamStartX = -1, nBeamBeat = -1, nBeamPos = -1, nBeamAlpha = 255;
@@ -458,7 +668,7 @@ namespace DTXMania
                 for (int i = nFrom; i <= nTo; i++)
                 {
                     STNote note = this.listNotes[i].note;
-                    int y = STAFF_BOTTOM_Y - note.nPos * STAFF_STEP;
+                    int y = nBaseY - note.nPos * nStep;
                     if (note.bStemUp)
                     {
                         if (y < nUpTop) nUpTop = y;
@@ -477,12 +687,12 @@ namespace DTXMania
                     // ledger lines above the staff (first for the crashes, second for the left crash)
                     for (int nLedger = 10; nLedger <= note.nPos; nLedger += 2)
                     {
-                        int nLedgerY = STAFF_BOTTOM_Y - nLedger * STAFF_STEP;
-                        int nLedgerX = x - LEDGER_W / 2;
-                        int nLedgerW = LEDGER_W;
+                        int nLedgerY = nBaseY - nLedger * nStep;
+                        int nLedgerX = x - nSc(LEDGER_W) / 2;
+                        int nLedgerW = nSc(LEDGER_W);
                         if (nLedgerX < LABEL_GUTTER_W) { nLedgerW -= LABEL_GUTTER_W - nLedgerX; nLedgerX = LABEL_GUTTER_W; }
-                        tDrawCell(SHAPE_SOLID, C_WHITE, nLedgerX, nLedgerY - LEDGER_H / 2,
-                                  nLedgerW, LEDGER_H, this.listNotes[i].nAlpha);
+                        tDrawCell(SHAPE_SOLID, C_WHITE, nLedgerX, nLedgerY - nSc(LEDGER_H) / 2,
+                                  nLedgerW, nSc(LEDGER_H), this.listNotes[i].nAlpha);
                     }
                 }
 
@@ -491,23 +701,24 @@ namespace DTXMania
                 // starts at the tip of the upper-right arm (+arm, -arm) and visibly continues it.
                 bool bUpEndIsX = (nUpEndShape == SHAPE_X || nUpEndShape == SHAPE_BOLD_X);
                 int nUpArm = bUpEndIsX ? nHeadHalfWidth(nUpEndShape) : nUpHalf;
-                int nStemX = x + nUpArm - (bUpEndIsX ? STEM_W / 2 : STEM_BITE);
+                int nStemW = nSc(STEM_W);
+                int nStemX = x + nUpArm - (bUpEndIsX ? nStemW / 2 : nSc(STEM_BITE));
                 if (bStems && nUpBottom != int.MinValue)
                 {
                     // The beam line is fixed, and a crash on its ledger lines sits above it, so the
                     // stem runs from the head to the line whichever side of it the head is on.
-                    int nStemEnd = bUpEndIsX ? nUpBottom - nUpArm + STEM_W : nUpBottom;
-                    int nStemTop = Math.Min(STEM_TOP_Y, nStemEnd);
-                    int nStemBot = Math.Max(STEM_TOP_Y, nStemEnd);
-                    tDrawCell(SHAPE_SOLID, C_WHITE, nStemX, nStemTop, STEM_W, nStemBot - nStemTop, nUpAlpha);
+                    int nStemEnd = bUpEndIsX ? nUpBottom - nUpArm + nStemW : nUpBottom;
+                    int nStemTop = Math.Min(nStemTopY, nStemEnd);
+                    int nStemBot = Math.Max(nStemTopY, nStemEnd);
+                    tDrawCell(SHAPE_SOLID, C_WHITE, nStemX, nStemTop, nStemW, nStemBot - nStemTop, nUpAlpha);
                 }
                 if (bStems && nDownTop != int.MaxValue)
                 {
                     bool bDownEndIsX = (nDownEndShape == SHAPE_X || nDownEndShape == SHAPE_BOLD_X);
                     int nDownArm = bDownEndIsX ? nHeadHalfWidth(nDownEndShape) : nDownHalf;
-                    int nDownStemX = x - nDownArm + (bDownEndIsX ? STEM_W / 2 : STEM_BITE) - STEM_W;
-                    int nDownStemTop = bDownEndIsX ? nDownTop + nDownArm - STEM_W : nDownTop;
-                    tDrawCell(SHAPE_SOLID, C_WHITE, nDownStemX, nDownStemTop, STEM_W, STEM_BOTTOM_Y - nDownStemTop, nDownAlpha);
+                    int nDownStemX = x - nDownArm + (bDownEndIsX ? nStemW / 2 : nSc(STEM_BITE)) - nStemW;
+                    int nDownStemTop = bDownEndIsX ? nDownTop + nDownArm - nStemW : nDownTop;
+                    tDrawCell(SHAPE_SOLID, C_WHITE, nDownStemX, nDownStemTop, nStemW, nStemBotY - nDownStemTop, nDownAlpha);
                 }
 
                 #region [ beams: join the up-stems of one beat (384 ticks per bar, 96 per beat) ]
@@ -519,8 +730,8 @@ namespace DTXMania
                         // still inside the same beat: extend the beam to here
                         int nBeams = tBeamCount(nPlaybackPosition - nBeamPos);
                         for (int i = 0; i < nBeams; i++)
-                            tDrawCell(SHAPE_SOLID, C_WHITE, nBeamStartX, STEM_TOP_Y + i * BEAM_GAP,
-                                      nStemX - nBeamStartX + STEM_W, BEAM_H, Math.Min(nBeamAlpha, nUpAlpha));
+                            tDrawCell(SHAPE_SOLID, C_WHITE, nBeamStartX, nStemTopY + i * nSc(BEAM_GAP),
+                                      nStemX - nBeamStartX + nStemW, nSc(BEAM_H), Math.Min(nBeamAlpha, nUpAlpha));
                     }
                     else
                     {
@@ -539,16 +750,19 @@ namespace DTXMania
             for (int i = 0; i < this.listNotes.Count; i++)
             {
                 STNote note = this.listNotes[i].note;
-                int y = STAFF_BOTTOM_Y - note.nPos * STAFF_STEP;
+                int y = nBaseY - note.nPos * nStep;
                 int w = nHeadCell(note.nShape);
                 tDrawCell(note.nShape, note.nColour, this.listNotes[i].x - w / 2, y - w / 2, w, w, this.listNotes[i].nAlpha);
             }
-
-            tDrawLaneLabels();
         }
 
         /// <summary>Cell size each notehead shape is stretched to.</summary>
-        private static int nHeadCell(int nShape)
+        private int nHeadCell(int nShape)
+        {
+            return nSc(nHeadCellBase(nShape));
+        }
+
+        private static int nHeadCellBase(int nShape)
         {
             if (nShape == SHAPE_X) return XHEAD_W;
             if (nShape == SHAPE_CIRCLE_X) return CIRCLEX_W;
@@ -563,7 +777,7 @@ namespace DTXMania
         /// x's ring 28.2/32, and an x head's arm *tips* sit at 25.2/32 diagonally (the x has no ink
         /// at the head's own height, which is why its stem attaches at the arm tip instead).
         /// </summary>
-        private static int nHeadHalfWidth(int nShape)
+        private int nHeadHalfWidth(int nShape)
         {
             int nCell = nHeadCell(nShape);
             switch (nShape)
@@ -587,7 +801,7 @@ namespace DTXMania
 
         public void tDrawBarLine(CChip pChip, int nBarNumber)
         {
-            if (this.tx == null) return;
+            if (this.tx == null || bPage) return;
             int x = nX(pChip.nDistanceFromBar.Drums) - BAR_LINE_LEAD;
             if (x < LABEL_GUTTER_W || x > 1284) return;     // never into the legend gutter
             tDrawCell(SHAPE_SOLID, C_WHITE, x - 1, STAFF_TOP_Y, 2, 4 * STAFF_SPACE + 1, 230);
@@ -596,7 +810,7 @@ namespace DTXMania
 
         public void tDrawBeatLine(CChip pChip)
         {
-            if (this.tx == null) return;
+            if (this.tx == null || bPage) return;
             int x = nX(pChip.nDistanceFromBar.Drums) - BAR_LINE_LEAD;
             if (x < LABEL_GUTTER_W || x > 1282) return;
             tDrawCell(SHAPE_SOLID, C_WHITE, x, STAFF_TOP_Y, 1, 4 * STAFF_SPACE + 1, 70);
@@ -604,7 +818,7 @@ namespace DTXMania
 
         public void tDrawLoopLine(int nDistanceFromBar, bool bIsEnd)
         {
-            if (this.tx == null) return;
+            if (this.tx == null || bPage) return;
             int x = nX(nDistanceFromBar) - BAR_LINE_LEAD;
             if (x < LABEL_GUTTER_W || x > 1284) return;
             tDrawCell(SHAPE_SOLID, C_PLAYHEAD, x - 1, BAND_TOP_Y + 8, 2, BAND_BOTTOM_Y - BAND_TOP_Y - 16, 200);
