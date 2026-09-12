@@ -147,27 +147,20 @@ namespace DTXMania
                 }
                 this.r直前の曲 = c曲リストノード;
 
-                this.tSelectedSongHighScoreHolderChanged(cスコア);
+                this.tSelectedSongHighScoreHolderChanged();
             }
         }
 
         /// <summary>
-        /// 選択中の譜面の scores.ini を読み、ドラムの1位の名前を控えておく。
+        /// ドラムの1位の名前を控えておく。scores.ini はハイスコアパネルが読んでいるので、そこから貰う。
         /// </summary>
-        private void tSelectedSongHighScoreHolderChanged(CScore cスコア)
+        private void tSelectedSongHighScoreHolderChanged()
         {
             string strBestPlayerName旧 = this.strBestPlayerName;
             this.strBestPlayerName = "";
 
-            if ((cスコア != null) && CDTXMania.ConfigIni.bDrumsEnabled)
-            {
-                List<CHighScores.CEntry> listEntries = CHighScores.tLoad(
-                    CHighScores.strFilePath(cスコア.FileInformation.AbsoluteFilePath)).listEntries(
-                    EInstrumentPart.DRUMS, this.n現在選択中の曲の難易度);
-
-                if (listEntries.Count > 0)
-                    this.strBestPlayerName = listEntries[0].strName;
-            }
+            if (CDTXMania.ConfigIni.bDrumsEnabled && (CDTXMania.stageSongSelection.actHighScorePanel != null))
+                this.strBestPlayerName = CDTXMania.stageSongSelection.actHighScorePanel.strTopEntryName ?? "";
 
             if (strBestPlayerName旧 != this.strBestPlayerName)
                 this.bBestPlayerNameの再生成が必要 = true;
