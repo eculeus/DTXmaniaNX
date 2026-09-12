@@ -29,10 +29,16 @@ jobs:
         shell: pwsh
         run: |
           $ver = if ($env:GITHUB_REF -like 'refs/tags/v*') { $env:GITHUB_REF.Substring(11) } else { 'dev-' + $env:GITHUB_SHA.Substring(0, 7) }
-          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          # Create the destination first: Copy-Item into a missing folder flattens the first
+          # directory it copies (dll\ landed at the root of the first zip).
+          New-Item -ItemType Directory -Force -Path dist\DTXManiaNX | Out-Null
           # Ship everything the game needs; leave Config.ini out so an upgrade keeps user settings
-          $exclude = @('Config.ini')
-          Get-ChildItem Runtime -Force | Where-Object { $exclude -notcontains $_.Name } | Copy-Item -Destination dist\DTXManiaNX -Recurse -Force
+          Get-ChildItem Runtime -Force | Where-Object { $_.Name -ne 'Config.ini' } | Copy-Item -Destination dist\DTXManiaNX -Recurse -Force
+          # This is an x86 build: the exe loads native BASS DLLs from dll\, so put the 32-bit set there
+          Copy-Item dist\DTXManiaNX\dll\32-bit\* dist\DTXManiaNX\dll\ -Force
+          Remove-Item dist\DTXManiaNX\dll\32-bit, dist\DTXManiaNX\dll\64-bit -Recurse -Force
+          Get-ChildItem dist\DTXManiaNX | Select-Object Name | Out-String | Write-Host
+          Get-ChildItem dist\DTXManiaNX\dll | Select-Object Name | Out-String | Write-Host
           Compress-Archive -Path dist\DTXManiaNX\* -DestinationPath "dist\DTXManiaNX-$ver.zip" -Force
           "VERSION=$ver" | Out-File -FilePath $env:GITHUB_ENV -Append
 
