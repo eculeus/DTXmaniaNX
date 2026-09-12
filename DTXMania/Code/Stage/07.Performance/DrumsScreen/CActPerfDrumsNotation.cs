@@ -137,11 +137,11 @@ namespace DTXMania
                           C_LEFT  = 2,      // 60,170,255  left hand / left foot
                           C_GREEN = 3,      // 92,224,116  hi tom
                           C_RED   = 4,      // 255,72,72   lo tom
-                          C_ORANGE = 5,     // 255,153,41  floor tom
+                          C_PURPLE = 5,     // 173,125,255 floor tom
                           C_DARK  = 6,      // band background
                           C_PLAYHEAD = 7,
                           C_KICK  = 8,      // 240,240,240 kick and left bass drum
-                          C_CRASH_R = 9,    // 80,230,230  right crash   ) the two crashes are the deliberate
+                          C_CRASH_R = 9,    // 255,150,30  right crash   ) the two crashes are the deliberate
                           C_CRASH_L = 10;   // 255,61,140  left crash    ) exception to the limb rule: they sit
                                             //   one ledger line apart and would otherwise be two yellow x heads
 
@@ -167,7 +167,7 @@ namespace DTXMania
             { EChannel.HiHatOpen,    new STNote( 9, SHAPE_CIRCLE_X, C_RIGHT, true ) },
             { EChannel.RideCymbal,   new STNote( 8, SHAPE_DIAMOND,  C_RIGHT, true ) },
             { EChannel.Cymbal,       new STNote(10, SHAPE_BOLD_X,   C_CRASH_R, true ) },
-            { EChannel.FloorTom,     new STNote( 3, SHAPE_HEAD,     C_ORANGE,true ) },
+            { EChannel.FloorTom,     new STNote( 3, SHAPE_HEAD,     C_PURPLE,true ) },
             { EChannel.BassDrum,     new STNote( 1, SHAPE_HEAD,     C_KICK,  false) },
             { EChannel.Snare,        new STNote( 5, SHAPE_HEAD,     C_LEFT,  true ) },
             { EChannel.LeftCymbal,   new STNote(12, SHAPE_X,        C_CRASH_L, true ) },
@@ -195,7 +195,7 @@ namespace DTXMania
             new STLaneLabel( 1, C_KICK,  "KICK"   ),        // 3  BD
             new STLaneLabel( 7, C_GREEN, "HI TOM" ),        // 4  HT
             new STLaneLabel( 6, C_RED,   "LO TOM" ),        // 5  LT
-            new STLaneLabel( 3, C_ORANGE,"FLOOR"  ),        // 6  FT
+            new STLaneLabel( 3, C_PURPLE,"FLOOR"  ),        // 6  FT
             new STLaneLabel(10, C_CRASH_R, "CRASH"  ),        // 7  CY
             new STLaneLabel(-1, C_LEFT,  "L.PEDAL"),        // 8  LP (and left bass drum)
             new STLaneLabel( 8, C_RIGHT, "RIDE"   ),        // 9  RD
@@ -305,9 +305,9 @@ namespace DTXMania
                 case C_LEFT:   return Color.FromArgb( 60, 170, 255);
                 case C_GREEN:  return Color.FromArgb( 92, 224, 116);
                 case C_RED:    return Color.FromArgb(255,  72,  72);
-                case C_ORANGE: return Color.FromArgb(255, 153,  41);
+                case C_PURPLE: return Color.FromArgb(173, 125, 255);
                 case C_KICK:   return Color.FromArgb(240, 240, 240);
-                case C_CRASH_R:return Color.FromArgb( 80, 230, 230);
+                case C_CRASH_R:return Color.FromArgb(255, 150,  30);
                 case C_CRASH_L:return Color.FromArgb(255,  61, 140);
                 default:       return Color.White;
             }
