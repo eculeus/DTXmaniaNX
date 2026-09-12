@@ -155,7 +155,36 @@ jobs:
           }
           New-SilentWav (Join-Path $PWD 'song\bgm.wav') 70
           New-SilentWav (Join-Path $PWD 'song\tick.wav') 0.05
+
+          # A second difficulty slot, so the song-select run has something to toggle between:
+          # DTXMania only cycles difficulties when the song has more than one chart. Same chart,
+          # different #DLEVEL, so the level in the high score box header differs per slot too.
+          # Latin-1 round-trips every byte, so the chart's Shift_JIS bytes survive the edit.
+          $enc = [System.Text.Encoding]::GetEncoding(28591)
+          $dtx = $enc.GetString([System.IO.File]::ReadAllBytes((Join-Path $PWD 'song\smoke.dtx')))
+          $dtx = $dtx -replace '(?m)^#DLEVEL:.*$', '#DLEVEL: 30'
+          [System.IO.File]::WriteAllBytes((Join-Path $PWD 'song\smoke2.dtx'), $enc.GetBytes($dtx))
+          Copy-Item Tests\SmokeSong\set.def song\ -Force
+
+          # Seed the named high score tables. One file per chart, one section per difficulty slot,
+          # and every name says which chart and which slot it came from, so a frame of the song
+          # select screen proves exactly which [Drums.<slot>] section the panel resolved.
+          function New-ScoresIni([string]$path, [string]$chart) {
+            $lines = @('; seeded by the CI smoke job')
+            foreach ($slot in 0..4) {
+              $lines += ''
+              $lines += "[Drums.$slot]"
+              $lines += "1=$chart-S$slot-A,$(900000 - $slot * 1000),SS,9$slot.75,55.50,2026-09-12"
+              $lines += "2=$chart-S$slot-B,$(750000 - $slot * 1000),S,8$slot.20,48.10,2026-09-11"
+              $lines += "3=$chart-S$slot-C,$(610000 - $slot * 1000),A,7$slot.05,40.00,2026-09-10"
+            }
+            [System.IO.File]::WriteAllLines($path, $lines, (New-Object System.Text.UTF8Encoding $false))
+          }
+          New-ScoresIni (Join-Path $PWD 'song\smoke.dtx.scores.ini')  'L1'
+          New-ScoresIni (Join-Path $PWD 'song\smoke2.dtx.scores.ini') 'L2'
+
           Get-ChildItem song | Select-Object Name, Length | Format-Table | Out-String | Write-Host
+          Get-Content song\smoke.dtx.scores.ini | Select-Object -First 8 | Out-String | Write-Host
 
       - name: Write the smoke-test Config.ini
         shell: pwsh
@@ -295,6 +324,159 @@ jobs:
             }
           }
 
+      # Third launch, this one NOT in compact mode: the game boots to its own title screen with
+      # DTXPath pointing at the smoke song folder, and is then driven with injected key presses to
+      # song select and through a few difficulty changes. keybd_event is used rather than SendKeys
+      # because DTXMania reads the keyboard through DirectInput, which sees driver-level input but
+      # not posted window messages.
+      - name: Launch at the title screen and drive to song select
+        shell: powershell
+        timeout-minutes: 6
+        continue-on-error: true
+        run: |
+          $ErrorActionPreference = 'Continue'
+          Add-Type -AssemblyName System.Drawing
+          Add-Type -AssemblyName System.Windows.Forms
+          Add-Type -TypeDefinition (@(
+            'using System;',
+            'using System.Runtime.InteropServices;',
+            'public class Drive {',
+            '  [DllImport("user32.dll")] public static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtra);',
+            '  [DllImport("user32.dll")] public static extern uint MapVirtualKey(uint uCode, uint uMapType);',
+            '  [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);',
+            '  public static void Tap(byte vk, int holdMs) {',
+            '    byte sc = (byte)MapVirtualKey(vk, 0);',
+            '    keybd_event(vk, sc, 0, UIntPtr.Zero);',
+            '    System.Threading.Thread.Sleep(holdMs);',
+            '    keybd_event(vk, sc, 2, UIntPtr.Zero);   // 2 = KEYEVENTF_KEYUP',
+            '  }',
+            '}'
+          ) -join [Environment]::NewLine)
+
+          $game    = Join-Path $PWD 'game'
+          $exe     = Join-Path $game 'DTXManiaNX.exe'
+          $songDir = Join-Path $PWD 'song'
+          $logPath = Join-Path $game 'DTXManiaLog.txt'
+          $shots   = Join-Path $PWD 'screenshots'
+          New-Item -ItemType Directory -Force -Path $shots | Out-Null
+
+          # The game holds the log open, so read it with a share-everything handle.
+          function Read-GameLog([string]$path) {
+            if (-not (Test-Path $path)) { return '' }
+            try {
+              $fs = [System.IO.File]::Open($path, 'Open', 'Read', 'ReadWrite')
+              $sr = New-Object System.IO.StreamReader($fs)
+              $t = $sr.ReadToEnd(); $sr.Close(); $fs.Close(); return $t
+            } catch { return '' }
+          }
+
+          $cfg = @(
+            '; Written by the CI smoke job (song select run).',
+            '[System]',
+            "DTXPath=$songDir",
+            'FullScreen=0',
+            'WindowWidth=1024',
+            'WindowHeight=576',
+            'WindowX=0',
+            'WindowY=0',
+            'VSyncWait=0',
+            'SoundDeviceType=0',
+            'Drums=1',
+            'Guitar=0',
+            'MovieMode=0',
+            'AVI=0',
+            'BGA=0',
+            'BGMSound=1',
+            'MasterVolume=0',
+            '[Log]',
+            'OutputLog=1',
+            'TraceSongSearch=1'
+          )
+          $cfgPath = Join-Path $game 'Config.ini'
+          [System.IO.File]::WriteAllLines($cfgPath, $cfg, (New-Object System.Text.ASCIIEncoding))
+          Get-Content $cfgPath | Out-String | Write-Host
+
+          # 1 s between frames: the whole point of this run is to catch the box changing.
+          $env:DTXMANIA_AUTOCAPTURE_MS = '1000'
+          $env:FDK_ALLOW_SILENT_SOUND_DEVICE = '1'
+
+          $VK_RETURN = 0x0D
+          $VK_X      = 0x58      # default DrumsKeyAssign HH=K033 -> SlimDX Key 33 -> X
+
+          Write-Host "Launching (no compact mode): $exe   DTXPath=$songDir"
+          $proc = Start-Process -FilePath $exe -WorkingDirectory $game -PassThru
+          $bounds = [System.Windows.Forms.SystemInformation]::VirtualScreen
+
+          function Focus-Game {
+            $h = $proc.MainWindowHandle
+            if ($h -ne [IntPtr]::Zero) { [void][Drive]::SetForegroundWindow($h) }
+            return $h
+          }
+          function Snap([string]$tag) {
+            try {
+              $bmp = New-Object System.Drawing.Bitmap($bounds.Width, $bounds.Height)
+              $g = [System.Drawing.Graphics]::FromImage($bmp)
+              $g.CopyFromScreen($bounds.X, $bounds.Y, 0, 0, $bmp.Size)
+              $g.Dispose()
+              $bmp.Save((Join-Path $shots ("desktop_select_{0}.png" -f $tag)), [System.Drawing.Imaging.ImageFormat]::Png)
+              $bmp.Dispose()
+            } catch { Write-Host "desktop capture failed: $_" }
+          }
+
+          # Wait for the title screen, then press Enter (cursor starts on GAME START).
+          $reachedSelect = $false
+          for ($t = 1; $t -le 20; $t++) {
+            Start-Sleep -Seconds 1
+            $proc.Refresh()
+            if ($proc.HasExited) { Write-Host "!! exited after ${t}s code $($proc.ExitCode)"; break }
+            $log = Read-GameLog $logPath
+            if ($log -match 'SongSelection') { $reachedSelect = $true; Write-Host "t=${t}s song select reached"; break }
+            if ($log -match 'Title') {
+              [void](Focus-Game)
+              Write-Host "t=${t}s title screen - pressing ENTER"
+              [Drive]::Tap([byte]$VK_RETURN, 80)
+              Start-Sleep -Milliseconds 800
+            }
+          }
+          Snap 'after_enter'
+
+          if (-not $proc.HasExited) {
+            # Let the list settle and the first frames of song select land.
+            for ($t = 1; $t -le 6; $t++) { [void](Focus-Game); Start-Sleep -Seconds 1 }
+            Snap 'select'
+
+            # HH x2 within 500 ms is the difficulty toggle in song select (CStageSongSelection,
+            # "HHx2: 難易度変更"). Four toggles, with a pause after each so several captured
+            # frames show each difficulty.
+            for ($i = 1; $i -le 4; $i++) {
+              [void](Focus-Game)
+              Write-Host "difficulty toggle $i (X, X)"
+              [Drive]::Tap([byte]$VK_X, 60)
+              Start-Sleep -Milliseconds 140
+              [Drive]::Tap([byte]$VK_X, 60)
+              for ($t = 1; $t -le 4; $t++) { [void](Focus-Game); Start-Sleep -Seconds 1 }
+              Snap ("toggle{0}" -f $i)
+            }
+          }
+
+          if (-not $proc.HasExited) { Stop-Process -Id $proc.Id -Force }
+          Start-Sleep -Seconds 2
+          Get-Process -Name DTXManiaNX -ErrorAction SilentlyContinue | Stop-Process -Force
+          Start-Sleep -Seconds 1
+
+          $raw  = Join-Path $game 'Capture_img'
+          $dest = Join-Path $game 'Capture_img_select'
+          $frames = @(Get-ChildItem $raw -ErrorAction SilentlyContinue)
+          Write-Host "=== Capture_img (select): $($frames.Count) frames, song select reached: $reachedSelect ==="
+          $frames | Select-Object Name, Length | Format-Table | Out-String | Write-Host
+          if (Test-Path $dest) { Remove-Item $dest -Recurse -Force }
+          if (Test-Path $raw) { Move-Item $raw $dest }
+          Copy-Item $cfgPath (Join-Path $game 'Config_select.ini') -Force
+          if (Test-Path $logPath) { Copy-Item $logPath (Join-Path $game 'DTXManiaLog_select.txt') -Force }
+          if ($frames.Count -lt 2) {
+            throw "the song-select run rendered $($frames.Count) frame(s) - see DTXManiaLog_select.txt"
+          }
+
       - name: Show DTXManiaLog.txt
         if: always()
         shell: pwsh
@@ -314,4 +496,6 @@ jobs:
             game/Capture_img*/**
             game/DTXManiaLog*.txt
             game/Config*.ini
-            song/smoke.dtx
+            song/*.dtx
+            song/set.def
+            song/*.scores.ini

@@ -379,6 +379,8 @@ namespace DTXMania
 					this.txBPMLabel.tDraw2D(CDTXMania.app.Device, 32, 258);
 
 				this.actPreimagePanel.OnUpdateAndDraw();
+				// ステータスパネルの "BEST:" がここで読まれた値を使うので、あちらより先に進行させること。
+				this.actHighScorePanel.OnUpdateAndDraw();
 			//	this.bIsEnumeratingSongs = !this.actPreimageパネル.bIsPlayingPremovie;				// #27060 2011.3.2 yyagi: #PREMOVIE再生中は曲検索を中断する
 
 				//this.actStatusPanel.OnUpdateAndDraw();
@@ -386,7 +388,6 @@ namespace DTXMania
 				this.actSongList.OnUpdateAndDraw();
 				this.actStatusPanel.OnUpdateAndDraw();
 				this.actPerHistoryPanel.OnUpdateAndDraw();
-				this.actHighScorePanel.OnUpdateAndDraw();
 				int y = 0;
 				if( this.ct登場時アニメ用共通.b進行中 )
 				{
