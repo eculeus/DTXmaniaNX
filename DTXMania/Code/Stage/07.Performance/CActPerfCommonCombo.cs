@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Text;
 using System.Runtime.InteropServices;
@@ -296,7 +296,8 @@ namespace DTXMania
             // "COMBO" を表示。
 
 
-            if (this.txCOMBOドラム != null)
+            // the notation view has no room for the "COMBO" caption under the digits
+            if (this.txCOMBOドラム != null && !CDTXMania.ConfigIni.bDrumsNotationView)
                 {
                     this.nコンボカウント.Drums = this.nCurrentCombo.Drums / 100;
 
