@@ -1,0 +1,10 @@
+; Two difficulty slots for the same CI smoke chart, so the song-select smoke run has a
+; difficulty to toggle with (DTXMania only cycles difficulties when a song has more than one).
+; L1 -> slot 0, L2 -> slot 1; the named high score table keys its sections off those slots
+; ([Drums.0] / [Drums.1]), so the box has to change content when the toggle is pressed.
+; smoke2.dtx is made by the workflow from smoke.dtx with a different #DLEVEL.
+#TITLE: CI Smoke Test
+#L1LABEL: BASIC
+#L1FILE: smoke.dtx
+#L2LABEL: EXTREME
+#L2FILE: smoke2.dtx
