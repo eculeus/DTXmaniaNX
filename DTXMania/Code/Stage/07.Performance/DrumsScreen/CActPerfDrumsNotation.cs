@@ -26,8 +26,9 @@ namespace DTXMania
         //  vertical-lane mode and is pushed to PANEL_Y here), so nothing      //
         //  overlaps the staff.  Tune these from a screenshot if needed.       //
         // ------------------------------------------------------------------ //
-        public const int PLAYHEAD_X = 300;                          // notes are hit when they reach this x
-                                                                    // (just past the legend gutter)
+        public const int PLAYHEAD_X = 150;                          // notes are hit when they reach this x:
+                                                                    // right after the legend, so nearly the whole
+                                                                    // band is upcoming music
         public const int STAFF_SPACE = 36;                          // px between two staff lines
         public const int STAFF_STEP = STAFF_SPACE / 2;              // one staff position (line -> space) = 18
         public const int STAFF_BOTTOM_Y = 380;                      // y of the bottom line
@@ -41,11 +42,11 @@ namespace DTXMania
         public const double X_SCALE = 0.80;                         // horizontal px per vertical-lane px.
                                                                     // The engine gives us (SPEED * 0.3575) lane px
                                                                     // per ms, so at the SPEED 2.0 setting this shows
-                                                                    // 940/(0.80*0.3575) = 3290 ms ahead, about 1.65
+                                                                    // 1130/(0.80*0.3575) = 3950 ms ahead, about two
                                                                     // bars of 4/4 at 120 BPM, with eighths 72 px
                                                                     // apart. The in-game SPEED setting still scales
                                                                     // it: SPEED 1.0 shows twice as much, 4.0 half.
-        public const int LOOKAHEAD_PX = 1500;                       // the chip loop normally stops feeding us chips
+        public const int LOOKAHEAD_PX = 1600;                       // the chip loop normally stops feeding us chips
                                                                     // past 600 lane px, which at this X_SCALE would
                                                                     // leave the right half of the band empty
 
@@ -78,9 +79,12 @@ namespace DTXMania
 
         // The judgement popup is drawn at the playhead, at the staff height of the lane it judges, so
         // it reads as belonging to that note. Small, and lifted clear of the head it belongs to.
-        public const int JUDGE_X = PLAYHEAD_X;                      // judgement popup centre x
+        public const int JUDGE_X = PLAYHEAD_X;                      // judgement popup anchor
+        public const int JUDGE_GAP = 12;                            // its right edge sits this far left of the
+                                                                    // playhead, in the region already played
         public const int JUDGE_RISE = 26;                           // its bottom edge sits this far over the head
-        public const float JUDGE_SCALE = 0.5f;
+        public const float JUDGE_SCALE = 0.9f;                      // nearly stock size; it is clamped to x >= 2,
+                                                                    // so it may overlap the legend gutter
 
         // Sizes derived from the staff spacing (36 px).
         private const int HEAD_W = 48;              // round notehead cell -> 38 x 29 px head (1.05 x 0.8 spaces)
@@ -93,11 +97,9 @@ namespace DTXMania
         private const int LEDGER_W = 54;
         private const int LEDGER_H = 4;
         private const int LINE_H = 3;               // staff line thickness
-        private const int BAR_LINE_LEAD = 20;       // bar / beat lines are drawn this far left of the
-                                                    // notes on that beat, so they never run through a head
-        private const int MIN_STEM_LEN = 8;         // a note sitting at the beam line (the left crash on its
-                                                    // second ledger line) keeps a short nub of a stem rather
-                                                    // than pushing a lone spike above the beams
+        private const int BAR_LINE_LEAD = 30;       // bar / beat lines are drawn this far left of the notes
+                                                    // on that beat, so the downbeat head has clear space
+                                                    // after the line instead of sitting against it
         private const int BEAM_H = 5;
         private const int BEAM_GAP = 10;
         /// <summary>Stems and beams are off by default: most players read the heads faster without them.</summary>
@@ -137,7 +139,11 @@ namespace DTXMania
                           C_RED   = 4,      // 255,72,72   lo tom
                           C_ORANGE = 5,     // 255,153,41  floor tom
                           C_DARK  = 6,      // band background
-                          C_PLAYHEAD = 7;
+                          C_PLAYHEAD = 7,
+                          C_KICK  = 8,      // 240,240,240 kick and left bass drum
+                          C_CRASH_R = 9,    // 80,230,230  right crash   ) the two crashes are the deliberate
+                          C_CRASH_L = 10;   // 255,61,140  left crash    ) exception to the limb rule: they sit
+                                            //   one ledger line apart and would otherwise be two yellow x heads
 
         private CTexture tx;
 
@@ -160,13 +166,13 @@ namespace DTXMania
             { EChannel.HiHatClose,   new STNote( 9, SHAPE_X,        C_RIGHT, true ) },
             { EChannel.HiHatOpen,    new STNote( 9, SHAPE_CIRCLE_X, C_RIGHT, true ) },
             { EChannel.RideCymbal,   new STNote( 8, SHAPE_DIAMOND,  C_RIGHT, true ) },
-            { EChannel.Cymbal,       new STNote(10, SHAPE_BOLD_X,   C_RIGHT, true ) },
+            { EChannel.Cymbal,       new STNote(10, SHAPE_BOLD_X,   C_CRASH_R, true ) },
             { EChannel.FloorTom,     new STNote( 3, SHAPE_HEAD,     C_ORANGE,true ) },
-            { EChannel.BassDrum,     new STNote( 1, SHAPE_HEAD,     C_RIGHT, false) },
+            { EChannel.BassDrum,     new STNote( 1, SHAPE_HEAD,     C_KICK,  false) },
             { EChannel.Snare,        new STNote( 5, SHAPE_HEAD,     C_LEFT,  true ) },
-            { EChannel.LeftCymbal,   new STNote(12, SHAPE_X,        C_LEFT,  true ) },
+            { EChannel.LeftCymbal,   new STNote(12, SHAPE_X,        C_CRASH_L, true ) },
             { EChannel.LeftPedal,    new STNote(-1, SHAPE_X,        C_LEFT,  false) },
-            { EChannel.LeftBassDrum, new STNote( 1, SHAPE_HEAD,     C_LEFT,  false) },
+            { EChannel.LeftBassDrum, new STNote( 1, SHAPE_HEAD,     C_KICK,  false) },
             { EChannel.HighTom,      new STNote( 7, SHAPE_HEAD,     C_GREEN, true ) },
             { EChannel.LowTom,       new STNote( 6, SHAPE_HEAD,     C_RED,   true ) },
         };
@@ -183,14 +189,14 @@ namespace DTXMania
         // Indexed exactly like CStagePerfCommonScreen.nチャンネル0Atoレーン07 / ELane.
         private static readonly STLaneLabel[] stLaneLabels = new STLaneLabel[]
         {
-            new STLaneLabel(12, C_LEFT,  "L.CRASH"),        // 0  LC
+            new STLaneLabel(12, C_CRASH_L, "L.CRASH"),        // 0  LC
             new STLaneLabel( 9, C_RIGHT, "HI-HAT" ),        // 1  HH (and open hi-hat)
             new STLaneLabel( 5, C_LEFT,  "SNARE"  ),        // 2  SD
-            new STLaneLabel( 1, C_RIGHT, "KICK"   ),        // 3  BD
+            new STLaneLabel( 1, C_KICK,  "KICK"   ),        // 3  BD
             new STLaneLabel( 7, C_GREEN, "HI TOM" ),        // 4  HT
             new STLaneLabel( 6, C_RED,   "LO TOM" ),        // 5  LT
             new STLaneLabel( 3, C_ORANGE,"FLOOR"  ),        // 6  FT
-            new STLaneLabel(10, C_RIGHT, "CRASH"  ),        // 7  CY
+            new STLaneLabel(10, C_CRASH_R, "CRASH"  ),        // 7  CY
             new STLaneLabel(-1, C_LEFT,  "L.PEDAL"),        // 8  LP (and left bass drum)
             new STLaneLabel( 8, C_RIGHT, "RIDE"   ),        // 9  RD
         };
@@ -300,6 +306,9 @@ namespace DTXMania
                 case C_GREEN:  return Color.FromArgb( 92, 224, 116);
                 case C_RED:    return Color.FromArgb(255,  72,  72);
                 case C_ORANGE: return Color.FromArgb(255, 153,  41);
+                case C_KICK:   return Color.FromArgb(240, 240, 240);
+                case C_CRASH_R:return Color.FromArgb( 80, 230, 230);
+                case C_CRASH_L:return Color.FromArgb(255,  61, 140);
                 default:       return Color.White;
             }
         }
@@ -485,9 +494,12 @@ namespace DTXMania
                 int nStemX = x + nUpArm - (bUpEndIsX ? STEM_W / 2 : STEM_BITE);
                 if (bStems && nUpBottom != int.MinValue)
                 {
-                    int nStemBottom = bUpEndIsX ? nUpBottom - nUpArm + STEM_W : nUpBottom;
-                    int nStemTop = Math.Min(STEM_TOP_Y, nStemBottom - MIN_STEM_LEN);
-                    tDrawCell(SHAPE_SOLID, C_WHITE, nStemX, nStemTop, STEM_W, nStemBottom - nStemTop, nUpAlpha);
+                    // The beam line is fixed, and a crash on its ledger lines sits above it, so the
+                    // stem runs from the head to the line whichever side of it the head is on.
+                    int nStemEnd = bUpEndIsX ? nUpBottom - nUpArm + STEM_W : nUpBottom;
+                    int nStemTop = Math.Min(STEM_TOP_Y, nStemEnd);
+                    int nStemBot = Math.Max(STEM_TOP_Y, nStemEnd);
+                    tDrawCell(SHAPE_SOLID, C_WHITE, nStemX, nStemTop, STEM_W, nStemBot - nStemTop, nUpAlpha);
                 }
                 if (bStems && nDownTop != int.MaxValue)
                 {

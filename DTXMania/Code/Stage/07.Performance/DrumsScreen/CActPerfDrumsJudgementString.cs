@@ -1277,9 +1277,11 @@ namespace DTXMania
 
                             if (CDTXMania.ConfigIni.bDrumsNotationView && j < 10)
                             {
-                                // notation view: at the playhead, at the staff height of the lane
-                                // being judged, lifted clear of the notehead itself
-                                num5 = CActPerfDrumsNotation.JUDGE_X - (this.stレーンサイズ[j].w / 2);
+                                // notation view: in the region already played, just left of the
+                                // playhead, at the staff height of the lane being judged
+                                int nJudgeCentre = CActPerfDrumsNotation.JUDGE_X - CActPerfDrumsNotation.JUDGE_GAP - 64;
+                                if (nJudgeCentre < 66) nJudgeCentre = 66;
+                                num5 = nJudgeCentre - (this.stレーンサイズ[j].w / 2);
                                 num6 = CActPerfDrumsNotation.nLaneY(j) - CActPerfDrumsNotation.JUDGE_RISE - 22;
                             }
                             int nRectX = CDTXMania.ConfigIni.nJudgeWidgh;
@@ -1295,9 +1297,12 @@ namespace DTXMania
                             bool bNotationJudge = CDTXMania.ConfigIni.bDrumsNotationView && j < 10;
                             if (bNotationJudge)
                             {
-                                x = CActPerfDrumsNotation.JUDGE_X - (int)(nRectX * CActPerfDrumsNotation.JUDGE_SCALE / 2f);
+                                x = CActPerfDrumsNotation.JUDGE_X - CActPerfDrumsNotation.JUDGE_GAP
+                                    - (int)(nRectX * CActPerfDrumsNotation.JUDGE_SCALE);
                                 y = CActPerfDrumsNotation.nLaneY(j) - CActPerfDrumsNotation.JUDGE_RISE
                                     - (int)(nRectY * CActPerfDrumsNotation.JUDGE_SCALE);
+                                if (x < 2) x = 2;       // the playhead is close to the legend: overlap it
+                                if (y < 2) y = 2;
                                 if (CDTXMania.stagePerfDrumsScreen.tx判定画像anime != null)
                                     CDTXMania.stagePerfDrumsScreen.tx判定画像anime.vcScaleRatio =
                                         new Vector3(CActPerfDrumsNotation.JUDGE_SCALE, CActPerfDrumsNotation.JUDGE_SCALE, 1f);
@@ -1399,9 +1404,11 @@ namespace DTXMania
 
                             if (CDTXMania.ConfigIni.bDrumsNotationView && j < 10)
                             {
-                                // notation view: at the playhead, at the staff height of the lane
-                                // being judged, lifted clear of the notehead itself
-                                num5 = CActPerfDrumsNotation.JUDGE_X - (this.stレーンサイズ[j].w / 2);
+                                // notation view: in the region already played, just left of the
+                                // playhead, at the staff height of the lane being judged
+                                int nJudgeCentre = CActPerfDrumsNotation.JUDGE_X - CActPerfDrumsNotation.JUDGE_GAP - 64;
+                                if (nJudgeCentre < 66) nJudgeCentre = 66;
+                                num5 = nJudgeCentre - (this.stレーンサイズ[j].w / 2);
                                 num6 = CActPerfDrumsNotation.nLaneY(j) - CActPerfDrumsNotation.JUDGE_RISE - 22;
                             }
                             int nRectX = 85;
