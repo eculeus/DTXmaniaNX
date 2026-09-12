@@ -114,6 +114,7 @@ namespace DTXMania
 		LoopDelete,
 		SkipForward,
 		SkipBackward, // = Rewind
+		Skip,         // 演奏中のスキップ。飛ばした区間のチップはMISS扱いになるのでスコアは有効なまま。
 		IncreasePlaySpeed,
 		DecreasePlaySpeed,
 		Restart,
