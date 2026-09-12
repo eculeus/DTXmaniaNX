@@ -75,7 +75,15 @@ namespace FDK
 			nHeight = videoInfo.BmiHeader.Height;
 			seeker = builder as IMediaSeeking;
 			DsError.ThrowExceptionForHR(seeker.GetDuration(out nMediaLength));
-			DsError.ThrowExceptionForHR(seeker.SetRate(playSpeed / 20.0));
+			// Some DirectShow sources (the WMV/ASF reader among them) refuse very low or high rates and
+			// return an error; that used to be thrown and took the whole game down when PlaySpeed was
+			// set far from 1.0. Try the requested rate, then fall back to normal speed and keep going.
+			int hrRate = seeker.SetRate(playSpeed / 20.0);
+			if (hrRate < 0)
+			{
+				System.Diagnostics.Trace.TraceWarning("CAviDS: SetRate({0}) failed (hr=0x{1:X8}); playing the movie at normal speed.", playSpeed / 20.0, hrRate);
+				seeker.SetRate(1.0);
+			}
 			control = builder as IMediaControl;
 			filter = builder as IMediaFilter;
 			grabber.SetBufferSamples(BufferThem: true);
