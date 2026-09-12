@@ -122,31 +122,17 @@ jobs:
           & expand.exe $cab.FullName -F:d3dx9_43.dll (Join-Path $PWD 'game') | Write-Host
           Get-ChildItem game\d3dx9_43.dll | Format-List Name, Length | Out-String | Write-Host
 
-      - name: Give the runner a sound device
-        shell: pwsh
+      - name: Report the audio endpoints
+        shell: powershell
         continue-on-error: true
+        timeout-minutes: 3
         run: |
-          # The performance screen drives itself off CSoundManager.rcPerformanceTimer, which only
-          # exists once some output device opened, so a runner with no audio endpoint crashes the
-          # moment the song starts. Scream is a virtual (loopback) sound card driver.
-          Set-Service -Name audiosrv -StartupType Automatic
-          Start-Service -Name audiosrv -ErrorAction SilentlyContinue
-          $tmp = $env:RUNNER_TEMP
-          $zip = Join-Path $tmp 'scream.zip'
-          Invoke-WebRequest -Uri 'https://github.com/duncanthrax/scream/releases/download/4.0/Scream4.0.zip' -OutFile $zip -UseBasicParsing
-          $dir = Join-Path $tmp 'scream'
-          Expand-Archive -Path $zip -DestinationPath $dir -Force
-          $inf = Get-ChildItem $dir -Recurse -Filter 'Scream.inf' | Where-Object { $_.FullName -match 'x64' } | Select-Object -First 1
-          if (-not $inf) { $inf = Get-ChildItem $dir -Recurse -Filter 'Scream.inf' | Select-Object -First 1 }
-          $cat = Join-Path $inf.DirectoryName 'Scream.cat'
-          Write-Host "Installing $($inf.FullName)"
-          Import-Certificate -FilePath $cat -CertStoreLocation Cert:\LocalMachine\TrustedPublisher | Out-Null
-          $devcon = Get-ChildItem $dir -Recurse -Filter 'devcon-x64.exe' | Select-Object -First 1
-          if (-not $devcon) { $devcon = Get-ChildItem $dir -Recurse -Filter 'devcon*.exe' | Select-Object -First 1 }
-          & $devcon.FullName install $inf.FullName *Scream | Write-Host
-          Start-Sleep -Seconds 5
-          Restart-Service -Name audiosrv -Force -ErrorAction SilentlyContinue
-          Get-CimInstance Win32_SoundDevice | Select-Object Name, Status | Format-Table | Out-String | Write-Host
+          # Win32_SoundDevice came back empty on this image. Ask the multimedia device enumerator
+          # directly, which is what DirectSound/WASAPI actually go through, before blaming the game.
+          Get-PnpDevice -Class 'MEDIA', 'AudioEndpoint' -ErrorAction SilentlyContinue |
+            Select-Object Status, Class, FriendlyName | Format-Table | Out-String | Write-Host
+          Get-CimInstance Win32_PnPEntity -Filter "PNPClass='AudioEndpoint'" -ErrorAction SilentlyContinue |
+            Select-Object Name, Status | Format-Table | Out-String | Write-Host
 
       - name: Build the smoke-test song
         shell: pwsh
@@ -189,8 +175,8 @@ jobs:
             '[System]',
             'DTXPath=',
             'FullScreen=0',          # windowed, so the desktop capture can see it
-            'WindowWidth=1280',      # the notation band is laid out for 1280x720
-            'WindowHeight=720',
+            'WindowWidth=1024',      # the runner's desktop is only 1024x768; the back buffer
+            'WindowHeight=576',      # stays 1280x720 either way, so Capture_img is full size
             'WindowX=0',
             'WindowY=0',
             'VSyncWait=0',
@@ -220,6 +206,7 @@ jobs:
 
       - name: Launch the game and take screenshots
         shell: powershell
+        timeout-minutes: 5
         run: |
           $ErrorActionPreference = 'Continue'
           Add-Type -AssemblyName System.Drawing
