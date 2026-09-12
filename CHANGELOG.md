@@ -16,6 +16,10 @@ bindings and settings are kept.
   bar's real length (a pickup bar gets none, a 3/4 bar two). The lead-in bar is not numbered.
   The hit flash is a short trail behind the playhead.
 - All nine lane labels are always drawn, whether or not the chart uses the lane.
+- Song-select leaderboard: it was hidden under the header banner and only refreshed on song
+  change. It now sits just below the banner, reloads whenever the song or the difficulty changes,
+  and its header names the difficulty and level the list belongs to (scores are kept per song and
+  per difficulty).
 
 ## 1.5.0-beta.10 — 2026-09-12
 
