@@ -1277,8 +1277,10 @@ namespace DTXMania
 
                             if (CDTXMania.ConfigIni.bDrumsNotationView && j < 10)
                             {
+                                // notation view: at the playhead, at the staff height of the lane
+                                // being judged, lifted clear of the notehead itself
                                 num5 = CActPerfDrumsNotation.JUDGE_X - (this.stレーンサイズ[j].w / 2);
-                                num6 = CActPerfDrumsNotation.JUDGE_Y;
+                                num6 = CActPerfDrumsNotation.nLaneY(j) - CActPerfDrumsNotation.JUDGE_RISE - 22;
                             }
                             int nRectX = CDTXMania.ConfigIni.nJudgeWidgh;
                             int nRectY = CDTXMania.ConfigIni.nJudgeHeight;
@@ -1294,7 +1296,8 @@ namespace DTXMania
                             if (bNotationJudge)
                             {
                                 x = CActPerfDrumsNotation.JUDGE_X - (int)(nRectX * CActPerfDrumsNotation.JUDGE_SCALE / 2f);
-                                y = CActPerfDrumsNotation.JUDGE_BOTTOM_Y - (int)(nRectY * CActPerfDrumsNotation.JUDGE_SCALE);
+                                y = CActPerfDrumsNotation.nLaneY(j) - CActPerfDrumsNotation.JUDGE_RISE
+                                    - (int)(nRectY * CActPerfDrumsNotation.JUDGE_SCALE);
                                 if (CDTXMania.stagePerfDrumsScreen.tx判定画像anime != null)
                                     CDTXMania.stagePerfDrumsScreen.tx判定画像anime.vcScaleRatio =
                                         new Vector3(CActPerfDrumsNotation.JUDGE_SCALE, CActPerfDrumsNotation.JUDGE_SCALE, 1f);
@@ -1396,8 +1399,10 @@ namespace DTXMania
 
                             if (CDTXMania.ConfigIni.bDrumsNotationView && j < 10)
                             {
+                                // notation view: at the playhead, at the staff height of the lane
+                                // being judged, lifted clear of the notehead itself
                                 num5 = CActPerfDrumsNotation.JUDGE_X - (this.stレーンサイズ[j].w / 2);
-                                num6 = CActPerfDrumsNotation.JUDGE_Y;
+                                num6 = CActPerfDrumsNotation.nLaneY(j) - CActPerfDrumsNotation.JUDGE_RISE - 22;
                             }
                             int nRectX = 85;
                             int nRectY = 35;

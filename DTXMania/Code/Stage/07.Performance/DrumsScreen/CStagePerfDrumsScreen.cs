@@ -91,6 +91,9 @@ namespace DTXMania
             base.actPlayInfo.jl = (CDTXMania.ConfigIni.bReverse.Drums ? base.nJudgeLinePosY.Drums - 159 : CStagePerfCommonScreen.nJudgeLineMaxPosY - base.nJudgeLinePosY.Drums);
 
             #region [ notation view: the staff band owns the top of the screen, so move the HUD below it ]
+            // Both directions every time: the actors outlive a trip through Config, and CActivity
+            // skips OnActivate() on anything already active, so turning NotationView off has to put
+            // the stock layout back rather than rely on the actors re-initialising themselves.
             if ( bNotationView )
             {
                 base.actScore.n本体X[ 0 ] = CActPerfDrumsNotation.SCORE_X;
@@ -98,6 +101,12 @@ namespace DTXMania
                 this.actProgressBar.tSetHorizontalLayout(
                     CActPerfDrumsNotation.PROGRESS_X, CActPerfDrumsNotation.PROGRESS_Y,
                     CActPerfDrumsNotation.PROGRESS_W, CActPerfDrumsNotation.PROGRESS_H );
+            }
+            else
+            {
+                base.actScore.n本体X[ 0 ] = 40;      // the stock CActPerfDrumsScore.OnActivate values
+                base.actScore.n本体Y = 13;
+                this.actProgressBar.tSetVerticalLayout();
             }
             #endregion
 

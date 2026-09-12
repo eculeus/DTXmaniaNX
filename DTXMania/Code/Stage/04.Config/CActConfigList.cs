@@ -727,6 +727,13 @@ namespace DTXMania
                 "Show the drum chart as scrolling sheet music (staff notation) with a fixed playhead, instead of vertical lanes.");
             this.listItems.Add(this.iDrumsNotationView);
 
+            this.iDrumsNotationStems = new CItemToggle("NotationStems", CDTXMania.ConfigIni.bDrumsNotationStems,
+                "ONにすると\n" +
+                "楽譜表示に符幹と連桁を\n" +
+                "描画します。",
+                "Draw note stems and beams on the notation staff. OFF shows the noteheads only, which is easier to read at a glance.");
+            this.listItems.Add(this.iDrumsNotationStems);
+
             this.iDrumsPosition = new CItemList("JudgePosition", CItemBase.EPanelType.Normal, (int)CDTXMania.ConfigIni.JudgementStringPosition.Drums,
                 "ゲーム中に表示される\n"+
                 "判定文字の位置を変更します。\n" +
@@ -3179,6 +3186,7 @@ namespace DTXMania
         private CItemBase iDrumsReturnToMenu;
         private CItemToggle iDrumsReverse;
         private CItemToggle iDrumsNotationView;
+        private CItemToggle iDrumsNotationStems;
         private CItemInteger iDrumsScrollSpeed;
         private CItemToggle iDrumsSnare;
         private CItemToggle iDrumsTight;
@@ -3434,6 +3442,7 @@ namespace DTXMania
             this.iDrumsScrollSpeed.nCurrentValue = CDTXMania.ConfigIni.nScrollSpeed.Drums;
             this.iDrumsReverse.bON = CDTXMania.ConfigIni.bReverse.Drums;
             this.iDrumsNotationView.bON = CDTXMania.ConfigIni.bDrumsNotationView;
+            this.iDrumsNotationStems.bON = CDTXMania.ConfigIni.bDrumsNotationStems;
             this.iDrumsPosition.n現在選択されている項目番号 = (int)CDTXMania.ConfigIni.JudgementStringPosition.Drums;
             this.iDrumsTight.bON = CDTXMania.ConfigIni.bTight;
             this.iDrumsInputAdjustTimeMs.nCurrentValue = CDTXMania.ConfigIni.nInputAdjustTimeMs.Drums;
@@ -3640,6 +3649,7 @@ namespace DTXMania
             CDTXMania.ConfigIni.nScrollSpeed.Drums = this.iDrumsScrollSpeed.nCurrentValue;
             CDTXMania.ConfigIni.bReverse.Drums = this.iDrumsReverse.bON;
             CDTXMania.ConfigIni.bDrumsNotationView = this.iDrumsNotationView.bON;
+            CDTXMania.ConfigIni.bDrumsNotationStems = this.iDrumsNotationStems.bON;
             CDTXMania.ConfigIni.JudgementStringPosition.Drums = (EType)this.iDrumsPosition.n現在選択されている項目番号;
             CDTXMania.ConfigIni.bTight = this.iDrumsTight.bON;
             CDTXMania.ConfigIni.nInputAdjustTimeMs.Drums = this.iDrumsInputAdjustTimeMs.nCurrentValue;		// #23580 2011.1.3 yyagi

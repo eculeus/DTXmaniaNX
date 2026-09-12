@@ -58,9 +58,8 @@ namespace DTXMania
 
             if (CDTXMania.ConfigIni.bDrumsEnabled)
             {
-                // notation view: under the (smaller) picture-in-picture movie, bottom right
-                this.n曲名X = CDTXMania.ConfigIni.bDrumsNotationView ? CActPerfDrumsNotation.TITLE_X : 950;
-                this.n曲名Y = CDTXMania.ConfigIni.bDrumsNotationView ? CActPerfDrumsNotation.TITLE_Y : 630;
+                this.n曲名X = 950;
+                this.n曲名Y = 630;
             }
             else if (CDTXMania.ConfigIni.bGuitarEnabled)
             {
@@ -159,6 +158,16 @@ namespace DTXMania
                     rectangle.Width -= rectangle.Right - this.n文字列の長さdot;
                 }
                  */
+
+                // Decided per frame, not at activation: the actor outlives a trip through Config,
+                // so turning NotationView off has to put the stock position straight back.
+                if (CDTXMania.ConfigIni.bDrumsEnabled)
+                {
+                    bool bNotation = CDTXMania.ConfigIni.bDrumsNotationView;
+                    // notation view: under the (smaller) picture-in-picture movie, bottom right
+                    this.n曲名X = bNotation ? CActPerfDrumsNotation.TITLE_X : 950;
+                    this.n曲名Y = bNotation ? CActPerfDrumsNotation.TITLE_Y : 630;
+                }
 
                 SharpDX.Matrix mat = SharpDX.Matrix.Identity;
 

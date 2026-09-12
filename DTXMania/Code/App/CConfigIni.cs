@@ -674,6 +674,7 @@ namespace DTXMania
 		public bool bLog作成解放ログ出力;
 		public STDGBVALUE<bool> bReverse;
 		public bool bDrumsNotationView;   // horizontal sheet-music view for the drums screen
+		public bool bDrumsNotationStems;  // ...with note stems and beams (off: noteheads only)
 		public bool bScoreIniを出力する;
 		public bool bSTAGEFAILEDEnabled;
 		public STDGBVALUE<bool> bSudden;
@@ -1393,6 +1394,7 @@ namespace DTXMania
 			this.bHidden = new STDGBVALUE<bool>();
 			this.bReverse = new STDGBVALUE<bool>();
 			this.bDrumsNotationView = false;
+			this.bDrumsNotationStems = true;
 			this.eRandom = new STDGBVALUE<ERandomMode>();
 			this.bLight = new STDGBVALUE<bool>();
 			this.bSpecialist = new STDGBVALUE<bool>();
@@ -2062,6 +2064,8 @@ namespace DTXMania
 			sw.WriteLine();
 			sw.WriteLine( "; Drums notation view: 1 = show the chart as scrolling sheet music instead of lanes" );
 			sw.WriteLine( "DrumsNotationView={0}", this.bDrumsNotationView ? 1 : 0 );
+			sw.WriteLine( "; Drums notation view: 1 = draw note stems and beams as well as the noteheads" );
+			sw.WriteLine( "DrumsNotationStems={0}", this.bDrumsNotationStems ? 1 : 0 );
 			sw.WriteLine();
 			sw.WriteLine( "; ギター/ベースRANDOMモード(0:OFF, 1:Mirror, 2:Random, 3:SuperRandom, 4:HyperRandom)" );
 			sw.WriteLine( "GuitarRandom={0}", (int) this.eRandom.Guitar );
@@ -3266,6 +3270,10 @@ namespace DTXMania
 											else if ( str3.Equals( "DrumsNotationView" ) )
 											{
 												this.bDrumsNotationView = CConversion.bONorOFF( str4[ 0 ] );
+											}
+											else if ( str3.Equals( "DrumsNotationStems" ) )
+											{
+												this.bDrumsNotationStems = CConversion.bONorOFF( str4[ 0 ] );
 											}
 											else if( str3.Equals( "GuitarReverse" ) )
 											{
