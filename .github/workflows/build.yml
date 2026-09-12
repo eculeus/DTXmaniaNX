@@ -189,8 +189,11 @@ jobs:
             '[PlayOption]',
             'DrumsReverse=0',
             'DrumsNotationView=1',
+            'DrumsScrollSpeed=3',    # 0=x0.5, 1=x1.0, 2=x1.5 ... so 3 is the owner's SPEED 2.0
             '[AutoPlay]',
-            'LC=1', 'HH=1', 'SD=1', 'BD=1', 'HT=1', 'LT=1',
+            # SD is left to the player so the frames exercise the miss path: MISS popups, the
+            # combo breaking and the judgement-string lane flash all only fire on a real lane.
+            'LC=1', 'HH=1', 'SD=0', 'BD=1', 'HT=1', 'LT=1',
             'FT=1', 'CY=1', 'RD=1', 'LP=1', 'LBD=1'
           )
           [System.IO.File]::WriteAllLines((Join-Path $PWD 'game\Config.ini'), $cfg, (New-Object System.Text.ASCIIEncoding))
