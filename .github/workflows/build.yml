@@ -96,8 +96,12 @@ jobs:
           [System.Windows.Forms.Screen]::AllScreens | ForEach-Object { Write-Host ("Screen          : {0} {1}" -f $_.DeviceName, $_.Bounds) }
           Get-CimInstance Win32_VideoController | Select-Object Name, DriverVersion, VideoModeDescription | Format-List | Out-String | Write-Host
           Write-Host "=== Audio ==="
+          # This image has both services running but no endpoint at all, which is why the game is
+          # launched with FDK_ALLOW_SILENT_SOUND_DEVICE. If a device ever shows up here, drop it.
           Get-Service audiosrv, AudioEndpointBuilder | Select-Object Name, Status, StartType | Format-Table | Out-String | Write-Host
           Get-CimInstance Win32_SoundDevice | Select-Object Name, Status | Format-Table | Out-String | Write-Host
+          Get-PnpDevice -Class 'MEDIA', 'AudioEndpoint' -ErrorAction SilentlyContinue |
+            Select-Object Status, Class, FriendlyName | Format-Table | Out-String | Write-Host
           Write-Host "=== DirectX DLLs in System32/SysWOW64 ==="
           foreach ($n in 'd3d9.dll', 'd3d9on12.dll', 'd3dx9_43.dll', 'd3d12.dll', 'd3d12core.dll', 'd3dref9.dll') {
             foreach ($d in "$env:WINDIR\System32", "$env:WINDIR\SysWOW64") {
@@ -121,18 +125,6 @@ jobs:
           if (-not $cab) { Get-ChildItem $out | Select-Object Name | Out-String | Write-Host; throw 'd3dx9_43 x86 cab not found in the redist' }
           & expand.exe $cab.FullName -F:d3dx9_43.dll (Join-Path $PWD 'game') | Write-Host
           Get-ChildItem game\d3dx9_43.dll | Format-List Name, Length | Out-String | Write-Host
-
-      - name: Report the audio endpoints
-        shell: powershell
-        continue-on-error: true
-        timeout-minutes: 3
-        run: |
-          # Win32_SoundDevice came back empty on this image. Ask the multimedia device enumerator
-          # directly, which is what DirectSound/WASAPI actually go through, before blaming the game.
-          Get-PnpDevice -Class 'MEDIA', 'AudioEndpoint' -ErrorAction SilentlyContinue |
-            Select-Object Status, Class, FriendlyName | Format-Table | Out-String | Write-Host
-          Get-CimInstance Win32_PnPEntity -Filter "PNPClass='AudioEndpoint'" -ErrorAction SilentlyContinue |
-            Select-Object Name, Status | Format-Table | Out-String | Write-Host
 
       - name: Build the smoke-test song
         shell: pwsh
@@ -276,8 +268,13 @@ jobs:
           Start-Sleep -Seconds 2
           Get-Process -Name DTXManiaNX -ErrorAction SilentlyContinue | Stop-Process -Force
           Write-Host "=== Capture_img ==="
-          Get-ChildItem (Join-Path $game 'Capture_img') -ErrorAction SilentlyContinue |
-            Select-Object Name, Length | Format-Table | Out-String | Write-Host
+          $frames = @(Get-ChildItem (Join-Path $game 'Capture_img') -ErrorAction SilentlyContinue)
+          $frames | Select-Object Name, Length | Format-Table | Out-String | Write-Host
+          # A run that never rendered still "passes" every step above, so say so loudly here.
+          if ($frames.Count -lt 2) {
+            throw "the game rendered $($frames.Count) frame(s) - see DTXManiaLog.txt in the smoke-screenshots artifact"
+          }
+          Write-Host "$($frames.Count) frames captured from the game's own back buffer (1280x720)."
 
       - name: Show DTXManiaLog.txt
         if: always()
