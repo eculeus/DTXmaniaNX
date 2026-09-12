@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Text;
 using System.Runtime.InteropServices;
@@ -675,7 +675,9 @@ namespace DTXMania
 
                     if( CDTXMania.ConfigIni.bDrumsEnabled )
                     {
-                        if( CDTXMania.ConfigIni.bGraph有効.Drums )
+                        // notation view hides the skill meter and owns the top of the screen, so the
+                        // clip always goes to the top right, just under the band
+                        if( CDTXMania.ConfigIni.bGraph有効.Drums && !CDTXMania.ConfigIni.bDrumsNotationView )
                         {
                             #region[ スキルメーター有効 ]
                             this.n本体X = 2;
@@ -710,8 +712,8 @@ namespace DTXMania
                         else
                         {
                             #region[ スキルメーター無効 ]
-                            this.n本体X = 854;
-                            this.n本体Y = 142;
+                            this.n本体X = CDTXMania.ConfigIni.bDrumsNotationView ? CActPerfDrumsNotation.MOVIE_X : 854;
+                            this.n本体Y = CDTXMania.ConfigIni.bDrumsNotationView ? CActPerfDrumsNotation.MOVIE_Y : 142;
 
                             if( this.fClipアスペクト比 > 1.77f )
                             {

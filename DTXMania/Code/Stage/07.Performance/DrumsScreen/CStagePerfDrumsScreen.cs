@@ -645,6 +645,7 @@ namespace DTXMania
 			}
 			this.tProcessChipHit( nHitTime, pChip );
 			this.actLaneFlushD.Start( (ELane) nLane, ( (float) n強弱度合い0to127 ) / 127f );
+			if ( bNotationView ) this.actNotation.tLaneHit( pChip.nChannelNumber );
 			this.actPad.Hit( nPad );
 			if( ( e判定 != EJudgement.Poor ) && ( e判定 != EJudgement.Miss ) )
 			{
@@ -2379,6 +2380,7 @@ namespace DTXMania
                     #region [ (B) ヒットしてなかった場合は、レーンフラッシュ、パッドアニメ、空打ち音再生を実行 ]
                     //-----------------------------
                     this.actLaneFlushD.Start((ELane)this.nパッド0Atoレーン07[nPad], ((float)inputEvent.nVelocity) / 127f);
+                    if (bNotationView) this.actNotation.tLaneHitByLane(this.nパッド0Atoレーン07[nPad]);
                     this.actPad.Hit(this.nパッド0Atoパッド08[nPad]);
 
                     if (CDTXMania.ConfigIni.bドラム打音を発声する)
@@ -3446,6 +3448,7 @@ namespace DTXMania
 				{
 					pChip.bHit = true;
 					this.actLaneFlushD.Start( (ELane) indexSevenLanes, ( (float) CInputManager.n通常音量 ) / 127f );
+					if ( bNotationView ) this.actNotation.tLaneHit( pChip.nChannelNumber );
 					bool flag = this.bInFillIn;
 					bool flag2 = this.bInFillIn && this.bフィルイン区間の最後のChipである( pChip );
 					//bool flag3 = flag2;

@@ -1287,6 +1287,19 @@ namespace DTXMania
                             int x = (xc - ((int)((110f * base.st状態[j].fX方向拡大率)))) - ((nRectX - 225) / 2);
                             int y = ((num6 + base.st状態[j].n相対Y座標) - ((int)(((140f * base.st状態[j].fY方向拡大率)) / 2.0))) - ((nRectY - 135) / 2);
 
+                            // Notation view: the big animated popup is JudgeWidgh x JudgeHeight (250x170
+                            // by default), far taller than the clear part of the band, so scale it down and
+                            // hang it from its bottom edge just above the staff, centred on the playhead.
+                            bool bNotationJudge = CDTXMania.ConfigIni.bDrumsNotationView && j < 10;
+                            if (bNotationJudge)
+                            {
+                                x = CActPerfDrumsNotation.JUDGE_X - (int)(nRectX * CActPerfDrumsNotation.JUDGE_SCALE / 2f);
+                                y = CActPerfDrumsNotation.JUDGE_BOTTOM_Y - (int)(nRectY * CActPerfDrumsNotation.JUDGE_SCALE);
+                                if (CDTXMania.stagePerfDrumsScreen.tx判定画像anime != null)
+                                    CDTXMania.stagePerfDrumsScreen.tx判定画像anime.vcScaleRatio =
+                                        new Vector3(CActPerfDrumsNotation.JUDGE_SCALE, CActPerfDrumsNotation.JUDGE_SCALE, 1f);
+                            }
+
                             //if (base.tx判定文字列[num4] != null)
                             {
                                 if (CDTXMania.ConfigIni.nJudgeFrames > 1 && CDTXMania.stagePerfDrumsScreen.tx判定画像anime != null)
@@ -1332,6 +1345,9 @@ namespace DTXMania
                                     base.tx判定文字列[num4].tDraw2D(CDTXMania.app.Device, x, y, base.st判定文字列[(int)base.st状態[j].judge].rc);
                                 }
 
+
+                                if (bNotationJudge && CDTXMania.stagePerfDrumsScreen.tx判定画像anime != null)
+                                    CDTXMania.stagePerfDrumsScreen.tx判定画像anime.vcScaleRatio = new Vector3(1f, 1f, 1f);
 
                                 if (base.nShowLagType == (int)EShowLagType.ON ||
                                      ((base.nShowLagType == (int)EShowLagType.GREAT_POOR) && (base.st状態[j].judge != EJudgement.Perfect)))
