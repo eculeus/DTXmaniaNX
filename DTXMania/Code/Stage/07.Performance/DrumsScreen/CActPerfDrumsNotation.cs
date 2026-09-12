@@ -94,6 +94,8 @@ namespace DTXMania
         public const int PAGE_HIT_ALPHA = 102;                      // 40%: played notes stay readable on the page
         public const int PAGE_RIGHT_MARGIN = 10;
         public const int PAGE_NOTE_INSET = 14;                      // gap between a bar line and its downbeat
+        public const int PAGE_SWAP_FADE_MS = 300;                   // a staff crossfades to its next line over
+                                                                    // this long when the playhead leaves it
 
         public const int JUDGE_X = PLAYHEAD_X;                      // judgement popup anchor in scroll mode
         public const int JUDGE_GAP = 12;                            // its right edge sits this far left of the
@@ -197,6 +199,11 @@ namespace DTXMania
         private int[] nBarTimeMs;                   // page view tempo map: bar-line times ...
         private int[] nBarPos;                      // ... and their playback positions
         private int nBarSearchHint;
+
+        // Which line each staff is showing, the one it is fading out of, and when that started.
+        private readonly int[] nSystemLine = new int[] { -1, -1 };
+        private readonly int[] nSystemOldLine = new int[] { -1, -1 };
+        private readonly long[] nSystemFadeMs = new long[] { 0, 0 };
 
         /// <summary>One drum voice: where it sits on the staff, how it is drawn and in which lane colour.</summary>
         private struct STNote
@@ -470,7 +477,24 @@ namespace DTXMania
             int nLine = (int)(dbPos / nTicksPerLine);
             this.nHeadX = nPageX(dbPos - (double)nLine * nTicksPerLine, nTicksPerLine);
 
-            nActiveBaseY = PAGE_BOTTOM_0;
+            // The playhead alternates: even lines play on the upper staff, odd lines on the lower
+            // one. The staff it is not on always holds the line that comes next, so the page never
+            // shifts vertically - only the staff the playhead just left changes its content.
+            int nPlaying = nLine & 1;
+            long nNow = CSoundManager.rcPerformanceTimer.nCurrentTime;
+            for (int k = 0; k < 2; k++)
+            {
+                int nWanted = (k == nPlaying) ? nLine : nLine + 1;
+                if (this.nSystemLine[k] != nWanted)
+                {
+                    this.nSystemOldLine[k] = this.nSystemLine[k];
+                    this.nSystemLine[k] = nWanted;
+                    this.nSystemFadeMs[k] = nNow;
+                }
+            }
+
+            int nPlayBottom = PAGE_BOTTOM_0 + nPlaying * PAGE_SYSTEM_DY;
+            nActiveBaseY = nPlayBottom;
             nActiveStep = PAGE_SPACE / 2;
             nActiveJudgeX = this.nHeadX;
 
@@ -481,23 +505,29 @@ namespace DTXMania
             {
                 int nBottom = PAGE_BOTTOM_0 + k * PAGE_SYSTEM_DY;
                 tSetSystem(nBottom, PAGE_SPACE, nBottom + PAGE_STEM_TOP_DY, nBottom + PAGE_STEM_BOTTOM_DY);
-                if (k == 0) tDrawLaneFlashes();             // the flash belongs to the line being played
+                if (k == nPlaying) tDrawLaneFlashes();      // the flash belongs to the line being played
                 for (int i = 0; i < 5; i++)
                     tDrawCell(SHAPE_SOLID, C_WHITE, LABEL_GUTTER_W, nBottom - i * PAGE_SPACE - nSc(LINE_H) / 2,
                               1280 - LABEL_GUTTER_W - PAGE_RIGHT_MARGIN, nSc(LINE_H), 235);
-                tDrawPageLine(nLine + k, nBars, nTicksPerLine);
+
+                long nSince = nNow - this.nSystemFadeMs[k];
+                int nFade = (nSince >= PAGE_SWAP_FADE_MS || this.nSystemOldLine[k] < 0)
+                            ? 255 : (int)(255L * nSince / PAGE_SWAP_FADE_MS);
+                if (nFade < 255)
+                    tDrawPageLine(this.nSystemOldLine[k], nBars, nTicksPerLine, 255 - nFade, false);
+                tDrawPageLine(this.nSystemLine[k], nBars, nTicksPerLine, nFade, true);
                 tDrawLaneLabels();
             }
 
-            // the playhead sweeps the upper system only
-            tDrawCell(SHAPE_SOLID, C_PLAYHEAD, this.nHeadX - 2, PAGE_BOTTOM_0 + PAGE_STEM_TOP_DY - 12, 4,
+            // the playhead sweeps whichever staff is being played
+            tDrawCell(SHAPE_SOLID, C_PLAYHEAD, this.nHeadX - 2, nPlayBottom + PAGE_STEM_TOP_DY - 12, 4,
                       PAGE_STEM_BOTTOM_DY - PAGE_STEM_TOP_DY + 12, 255);
         }
 
         /// <summary>One staff line of the page: its bars, beat ticks, bar numbers and notes.</summary>
-        private void tDrawPageLine(int nLineIndex, int nBars, int nTicksPerLine)
+        private void tDrawPageLine(int nLineIndex, int nBars, int nTicksPerLine, int nAlphaScale, bool bDrawGrid)
         {
-            if (nLineIndex < 0) return;
+            if (nLineIndex < 0 || nAlphaScale <= 0) return;
             int nStartPos = nLineIndex * nTicksPerLine;
             int nStaffH = 4 * this.nSpace + 1;
             int nStaffTop = this.nBaseY - 4 * this.nSpace;
@@ -505,13 +535,19 @@ namespace DTXMania
             for (int b = 0; b <= nBars; b++)
             {
                 int x = nPageX(b * 384, nTicksPerLine) - PAGE_NOTE_INSET;
-                tDrawCell(SHAPE_SOLID, C_WHITE, x - 1, nStaffTop, 2, nStaffH, 230);
+                // the bar grid is the same for either line, so only the incoming pass draws it
+                if (bDrawGrid)
+                {
+                    tDrawCell(SHAPE_SOLID, C_WHITE, x - 1, nStaffTop, 2, nStaffH, 230);
+                    for (int q = 1; q < 4; q++)
+                        tDrawCell(SHAPE_SOLID, C_WHITE, nPageX(b * 384 + q * 96, nTicksPerLine) - PAGE_NOTE_INSET,
+                                  nStaffTop, 1, nStaffH, 70);
+                }
                 if (b == nBars) break;
-                CDTXMania.actDisplayString.tPrint(x + 4, this.nBaseY + PAGE_BAR_NUMBER_DY,
-                                                  CCharacterConsole.EFontType.White, (nLineIndex * nBars + b).ToString());
-                for (int q = 1; q < 4; q++)
-                    tDrawCell(SHAPE_SOLID, C_WHITE, nPageX(b * 384 + q * 96, nTicksPerLine) - PAGE_NOTE_INSET,
-                              nStaffTop, 1, nStaffH, 70);
+                // the console font has no alpha, so the numbers change over at the half way point
+                if (nAlphaScale >= 128)
+                    CDTXMania.actDisplayString.tPrint(x + 4, this.nBaseY + PAGE_BAR_NUMBER_DY,
+                                                      CCharacterConsole.EFontType.White, (nLineIndex * nBars + b).ToString());
             }
 
             // the page is laid out by bar, so the chips come straight from the chart, not from the
@@ -532,7 +568,7 @@ namespace DTXMania
                 STPendingNote pending;
                 pending.x = nPageX(chip.nPlaybackPosition - nStartPos, nTicksPerLine);
                 pending.nPlaybackPosition = chip.nPlaybackPosition;
-                pending.nAlpha = chip.bHit ? PAGE_HIT_ALPHA : 255;
+                pending.nAlpha = (chip.bHit ? PAGE_HIT_ALPHA : 255) * nAlphaScale / 255;
                 pending.note = note;
                 this.listNotes.Add(pending);
             }
