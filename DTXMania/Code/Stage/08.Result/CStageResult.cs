@@ -284,7 +284,16 @@ namespace DTXMania
 
 				base.OnActivate();
 
-				this.tPrepareHighScores();		// 名前つきハイスコア表 (scores.ini) の準備。score.ini とは独立。
+				// 名前つきハイスコア表 (scores.ini) の準備。score.ini とは独立。
+				// ここで転んでもリザルト画面ごと落ちないように、握りつぶしてログに出すだけにする。
+				try
+				{
+					this.tPrepareHighScores();
+				}
+				catch( Exception exception )
+				{
+					Trace.TraceWarning( "名前つきハイスコアの準備に失敗しました。{0}", exception.Message );
+				}
 
 				//this.actProgressBar.t表示レイアウトを設定する(180, 540, 20, 460);
 				//this.actProgressBar.t演奏記録から区間情報を設定する(st演奏記録);
@@ -825,7 +834,14 @@ namespace DTXMania
 				this.actNameEntry.OnUpdateAndDraw();
 				if( this.actNameEntry.bInputJustFinished )
 				{
-					this.tSaveHighScoreEntry();
+					try
+					{
+						this.tSaveHighScoreEntry();
+					}
+					catch( Exception exception )
+					{
+						Trace.TraceWarning( "名前つきハイスコアの記録に失敗しました。{0}", exception.Message );
+					}
 				}
 			}
 			return 0;
@@ -923,6 +939,16 @@ namespace DTXMania
 
 			if( bドラムを演奏した && bこの演奏は記録される )
 				this.actNameEntry.tStartInput( CDTXMania.ConfigIni.strLastPlayerName );
+
+			// 名前入力が出なかった理由をログから追えるようにしておく。
+			Trace.TraceInformation(
+				"名前つきハイスコア: 名前入力={0} (記録される={1} [ScoreIni={2} Training={3} PlaySpeed={4}] ドラム演奏={5} [Drums={6} GtRev={7} AllAuto={8} チップ有={9} Total={10}] 難易度={11} file={12})",
+				bドラムを演奏した && bこの演奏は記録される, bこの演奏は記録される,
+				CDTXMania.ConfigIni.bScoreIniを出力する, this.bIsTrainingMode, CDTXMania.ConfigIni.nPlaySpeed,
+				bドラムを演奏した, CDTXMania.ConfigIni.bDrumsEnabled, CDTXMania.ConfigIni.bGuitarRevolutionMode,
+				CDTXMania.ConfigIni.bAllDrumsAreAutoPlay, CDTXMania.DTX.bチップがある.Drums,
+				this.stPerformanceEntry.Drums.nTotalChipsCount,
+				this.nHighScore難易度, this.strHighScoresファイル名 );
 		}
 
 		/// <summary>

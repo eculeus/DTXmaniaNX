@@ -195,6 +195,7 @@
     <Compile Include="Code\Stage\04.Config\CActConfigList.cs" />
     <Compile Include="Code\Stage\04.Config\CStageConfig.cs" />
     <Compile Include="Code\Stage\05.SongSelection\CActSelectArtistComment.cs" />
+    <Compile Include="Code\Stage\05.SongSelection\CActSelectHighScorePanel.cs" />
     <Compile Include="Code\Stage\05.SongSelection\CActSelectInformation.cs" />
     <Compile Include="Code\Stage\05.SongSelection\CActSelectPopupMenu.cs" />
     <Compile Include="Code\Stage\05.SongSelection\CActSelectPreimagePanel.cs" />

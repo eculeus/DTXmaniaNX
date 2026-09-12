@@ -116,6 +116,7 @@ namespace DTXMania
 //			base.listChildActivities.Add( this.actFOtoNowLoading = new CActFIFOBlack() );	// #27787 2012.3.10 yyagi 曲決定時の画面フェードアウトの省略
 			base.listChildActivities.Add( this.actSongList = new CActSelectSongList() );
 			base.listChildActivities.Add( this.actStatusPanel = new CActSelectStatusPanel() );
+			base.listChildActivities.Add( this.actHighScorePanel = new CActSelectHighScorePanel() );
 			base.listChildActivities.Add( this.actPerHistoryPanel = new CActSelectPerfHistoryPanel() );
 			base.listChildActivities.Add( this.actPreimagePanel = new CActSelectPreimagePanel() );
 			base.listChildActivities.Add( this.actPresound = new CActSelectPresound() );
@@ -143,6 +144,7 @@ namespace DTXMania
 			this.actPreimagePanel.t選択曲が変更された();
 			this.actPresound.t選択曲が変更された();
 			this.actPerHistoryPanel.t選択曲が変更された();
+			this.actHighScorePanel.tSelectedSongChanged();		// ステータスパネルの "BEST:" が読むので、先に更新しておくこと。
 			this.actStatusPanel.tSelectedSongChanged();
 			this.actArtistComment.t選択曲が変更された();
 
@@ -384,6 +386,7 @@ namespace DTXMania
 				this.actSongList.OnUpdateAndDraw();
 				this.actStatusPanel.OnUpdateAndDraw();
 				this.actPerHistoryPanel.OnUpdateAndDraw();
+				this.actHighScorePanel.OnUpdateAndDraw();
 				int y = 0;
 				if( this.ct登場時アニメ用共通.b進行中 )
 				{
@@ -891,6 +894,7 @@ namespace DTXMania
 		private CActSelectPresound actPresound;
 //		private CActOptionPanel actオプションパネル;
 		public CActSelectStatusPanel actStatusPanel;  // actステータスパネル
+		public CActSelectHighScorePanel actHighScorePanel;  // 名前つきハイスコア表 (scores.ini)
 		private CActSelectPerfHistoryPanel actPerHistoryPanel;  // act演奏履歴パネル
 		private CActSelectSongList actSongList;
 		private CActSelectShowCurrentPosition actShowCurrentPosition;
