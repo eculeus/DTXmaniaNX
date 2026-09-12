@@ -678,6 +678,7 @@ namespace DTXMania
 		public bool bDrumsNotationPage { get { return this.nDrumsNotationView == 2; } }
 		public bool bDrumsNotationStems;  // ...with note stems and beams (off: noteheads only)
 		public int nDrumsNotationBarsPerLine;   // page view: bars per staff line (ini only, 1-8)
+		public int nDrumsNotationPrerollMs;     // page view: run-in before a line's first bar (ini only, ms)
 		public bool bScoreIniを出力する;
 		public bool bSTAGEFAILEDEnabled;
 		public STDGBVALUE<bool> bSudden;
@@ -1399,6 +1400,7 @@ namespace DTXMania
 			this.nDrumsNotationView = 0;
 			this.bDrumsNotationStems = true;
 			this.nDrumsNotationBarsPerLine = 4;
+			this.nDrumsNotationPrerollMs = 600;
 			this.eRandom = new STDGBVALUE<ERandomMode>();
 			this.bLight = new STDGBVALUE<bool>();
 			this.bSpecialist = new STDGBVALUE<bool>();
@@ -2072,6 +2074,8 @@ namespace DTXMania
 			sw.WriteLine( "DrumsNotationStems={0}", this.bDrumsNotationStems ? 1 : 0 );
 			sw.WriteLine( "; Drums notation page view: how many bars fit on one staff line (1-8)" );
 			sw.WriteLine( "DrumsNotationBarsPerLine={0}", this.nDrumsNotationBarsPerLine );
+			sw.WriteLine( "; Drums notation page view: run-in before each line's first bar, ms (0-3000)" );
+			sw.WriteLine( "DrumsNotationPrerollMs={0}", this.nDrumsNotationPrerollMs );
 			sw.WriteLine();
 			sw.WriteLine( "; ギター/ベースRANDOMモード(0:OFF, 1:Mirror, 2:Random, 3:SuperRandom, 4:HyperRandom)" );
 			sw.WriteLine( "GuitarRandom={0}", (int) this.eRandom.Guitar );
@@ -3281,6 +3285,10 @@ namespace DTXMania
 											else if ( str3.Equals( "DrumsNotationBarsPerLine" ) )
 											{
 												this.nDrumsNotationBarsPerLine = CConversion.nGetNumberIfInRange( str4, 1, 8, this.nDrumsNotationBarsPerLine );
+											}
+											else if ( str3.Equals( "DrumsNotationPrerollMs" ) )
+											{
+												this.nDrumsNotationPrerollMs = CConversion.nGetNumberIfInRange( str4, 0, 3000, this.nDrumsNotationPrerollMs );
 											}
 											else if ( str3.Equals( "DrumsNotationStems" ) )
 											{
