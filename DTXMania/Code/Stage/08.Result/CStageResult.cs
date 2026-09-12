@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Text;
 using System.Diagnostics;
@@ -53,6 +54,8 @@ namespace DTXMania
 			base.listChildActivities.Add( this.actParameterPanel = new CActResultParameterPanel() );
 			base.listChildActivities.Add( this.actRank = new CActResultRank() );
 			base.listChildActivities.Add( this.actSongBar = new CActResultSongBar() );
+			base.listChildActivities.Add( this.actHighScorePanel = new CActResultHighScorePanel() );
+			base.listChildActivities.Add( this.actNameEntry = new CActResultNameEntry() );
 			//base.listChildActivities.Add( this.actProgressBar = new CActPerfProgressBar(true) );
 			base.listChildActivities.Add( this.actFI = new CActFIFOWhite() );
 			base.listChildActivities.Add( this.actFO = new CActFIFOBlack() );
@@ -280,6 +283,9 @@ namespace DTXMania
 				}
 
 				base.OnActivate();
+
+				this.tPrepareHighScores();		// 名前つきハイスコア表 (scores.ini) の準備。score.ini とは独立。
+
 				//this.actProgressBar.t表示レイアウトを設定する(180, 540, 20, 460);
 				//this.actProgressBar.t演奏記録から区間情報を設定する(st演奏記録);
 			}
@@ -683,6 +689,7 @@ namespace DTXMania
                 {
                     this.bAnimationComplete = false;
                 }
+				this.actHighScorePanel.OnUpdateAndDraw();
 				if( base.ePhaseID == CStage.EPhase.Common_FadeIn )
 				{
 					if( this.actFI.OnUpdateAndDraw() != 0 )
@@ -696,6 +703,7 @@ namespace DTXMania
 				}
 				#region [ #24609 2011.3.14 yyagi ランク更新or演奏型スキル更新時、リザルト画像をpngで保存する ]
 				if ( this.bAnimationComplete == true && this.bIsCheckedWhetherResultScreenShouldSaveOrNot == false	// #24609 2011.3.14 yyagi; to save result screen in case BestRank or HiSkill.
+					&& !this.actNameEntry.bIsInputting															// 名前入力中はキャプチャしない。
 					&& CDTXMania.ConfigIni.bScoreIniを出力する
 					&& CDTXMania.ConfigIni.bIsAutoResultCapture)												// #25399 2011.6.9 yyagi
 				{
@@ -706,7 +714,7 @@ namespace DTXMania
 
 				// キー入力
 
-				if( CDTXMania.actPluginOccupyingInput == null )
+				if( CDTXMania.actPluginOccupyingInput == null && !this.actNameEntry.bIsInputting )	// 名前入力中は、リザルト画面の通常のキー入力を止める。
 				{
 					if( CDTXMania.ConfigIni.bドラム打音を発声する && CDTXMania.ConfigIni.bDrumsEnabled )
 					{
@@ -811,6 +819,14 @@ namespace DTXMania
 						}
 					}
 				}
+
+				// 名前入力は、上のキー入力より後に進行させること。
+				// (でないと、確定の ENTER がそのままリザルト画面の終了にも使われてしまう。)
+				this.actNameEntry.OnUpdateAndDraw();
+				if( this.actNameEntry.bInputJustFinished )
+				{
+					this.tSaveHighScoreEntry();
+				}
 			}
 			return 0;
 		}
@@ -835,7 +851,13 @@ namespace DTXMania
 		private CActResultParameterPanel actParameterPanel;
 		private CActResultRank actRank;
 		private CActResultImage actResultImage;
-		private CActResultSongBar actSongBar;		
+		private CActResultSongBar actSongBar;
+		private CActResultHighScorePanel actHighScorePanel;
+		private CActResultNameEntry actNameEntry;
+		private CHighScores highScores;
+		private string strHighScoresファイル名;
+		private int nHighScore難易度;
+		private int nNewHighScoreIndex;
 		//private CActPerfProgressBar actProgressBar;
 		private bool bAnimationComplete;  // bアニメが完了
 		private bool bIsCheckedWhetherResultScreenShouldSaveOrNot;				// #24509 2011.3.14 yyagi
@@ -855,6 +877,83 @@ namespace DTXMania
 
 		private readonly CActSelectBackgroundAVI actBackgroundVideoAVI;
 		private CDTX.CAVI rBackgroundVideoAVI;
+
+		#region [ 名前つきハイスコア (scores.ini) ]
+		/// <summary>
+		/// <para>この譜面の scores.ini を読み込み、表の表示内容と、名前入力を出すかどうかを決める。</para>
+		/// <para>score.ini の記録内容には一切触れない。</para>
+		/// </summary>
+		private void tPrepareHighScores()
+		{
+			this.highScores = null;
+			this.strHighScoresファイル名 = null;
+			this.nHighScore難易度 = 0;
+			this.nNewHighScoreIndex = -1;
+			this.actHighScorePanel.bIsVisible = false;
+
+			if( CDTXMania.DTX == null )
+				return;
+
+			this.strHighScoresファイル名 = CHighScores.strFilePath( CDTXMania.DTX.strファイル名の絶対パス );
+			if( string.IsNullOrEmpty( this.strHighScoresファイル名 ) )
+				return;
+
+			if( !CDTXMania.bCompactMode && ( CDTXMania.stageSongSelection != null ) )
+				this.nHighScore難易度 = CDTXMania.stageSongSelection.nConfirmedSongDifficulty;
+
+			this.highScores = CHighScores.tLoad( this.strHighScoresファイル名 );
+			this.actHighScorePanel.tSetEntries( this.highScores.listEntries( EInstrumentPart.DRUMS, this.nHighScore難易度 ), -1 );
+
+			// 記録が score.ini に保存される条件と同じ。(トレーニング使用時や、速度変更時の設定次第では保存しない)
+			bool bこの演奏は記録される =
+				CDTXMania.ConfigIni.bScoreIniを出力する &&
+				!this.bIsTrainingMode &&
+				( CDTXMania.ConfigIni.bSaveScoreIfModifiedPlaySpeed || CDTXMania.ConfigIni.nPlaySpeed == 20 );
+
+			// 実際にドラムを叩いた演奏のみが対象。(オートプレイは除く)
+			bool bドラムを演奏した =
+				CDTXMania.ConfigIni.bDrumsEnabled &&
+				!CDTXMania.ConfigIni.bGuitarRevolutionMode &&
+				!CDTXMania.ConfigIni.bAllDrumsAreAutoPlay &&
+				CDTXMania.DTX.bチップがある.Drums &&
+				( this.stPerformanceEntry.Drums.nTotalChipsCount > 0 );
+
+			// 演奏速度を変えたときなどは画面右側に注意書きが出るので、表とは同時に出さない。
+			this.actHighScorePanel.bIsVisible = bドラムを演奏した && bこの演奏は記録される && ( CDTXMania.ConfigIni.nPlaySpeed == 20 );
+
+			if( bドラムを演奏した && bこの演奏は記録される )
+				this.actNameEntry.tStartInput( CDTXMania.ConfigIni.strLastPlayerName );
+		}
+
+		/// <summary>
+		/// 入力された名前で今回の演奏を scores.ini に記録する。(ESC で打ち切られた場合は何もしない)
+		/// </summary>
+		private void tSaveHighScoreEntry()
+		{
+			if( this.actNameEntry.bIsCancelled || ( this.highScores == null ) || string.IsNullOrEmpty( this.strHighScoresファイル名 ) )
+				return;
+
+			string strName = this.actNameEntry.strConfirmedName;
+			if( string.IsNullOrEmpty( strName ) )
+				strName = CHighScores.strDefaultName;
+
+			CDTXMania.ConfigIni.strLastPlayerName = strName;		// 次回の既定値。Config.ini に保存される。
+
+			CHighScores.CEntry entry = new CHighScores.CEntry();
+			entry.strName = strName;
+			entry.nScore = this.stPerformanceEntry.Drums.nスコア;
+			entry.nRankValue = this.nRankValue.Drums;
+			entry.dbAchievement = this.stPerformanceEntry.Drums.dbPerformanceSkill;
+			entry.dbSkill = this.stPerformanceEntry.Drums.dbGameSkill;
+			entry.strDate = DateTime.Now.ToString( "yyyy-MM-dd", CultureInfo.InvariantCulture );
+
+			this.nNewHighScoreIndex = this.highScores.tAddEntry( EInstrumentPart.DRUMS, this.nHighScore難易度, entry );
+			if( this.nNewHighScoreIndex >= 0 )
+				this.highScores.tExport( this.strHighScoresファイル名 );
+
+			this.actHighScorePanel.tSetEntries( this.highScores.listEntries( EInstrumentPart.DRUMS, this.nHighScore難易度 ), this.nNewHighScoreIndex );
+		}
+		#endregion
 
 		#region [ #24609 リザルト画像をpngで保存する ]		// #24609 2011.3.14 yyagi; to save result screen in case BestRank or HiSkill.
 		/// <summary>
