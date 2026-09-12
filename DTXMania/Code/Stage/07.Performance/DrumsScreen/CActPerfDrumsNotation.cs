@@ -112,7 +112,7 @@ namespace DTXMania
 
         // Hit feedback: the lane the player just hit lights up across the part of the band that has
         // already gone by, plus a glow at the playhead, fading out over LANE_FLASH_MS.
-        private const int LANE_FLASH_MS = 150;
+        private const int LANE_FLASH_MS = 200;
         private const int LANE_FLASH_ALPHA = 120;
         private const int LANE_GLOW_ALPHA = 210;
         private const int LANE_GLOW_W = 40;

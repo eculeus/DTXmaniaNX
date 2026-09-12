@@ -3134,6 +3134,7 @@ namespace DTXMania
         }
 		protected override bool bNotationView { get { return CDTXMania.ConfigIni.bDrumsNotationView; } }
 		protected override void tDrawNotationBeatLine( CChip pChip ) { this.actNotation.tDrawBeatLine( pChip ); }
+		protected override void tNotationLaneHit( CChip pChip ) { this.actNotation.tLaneHit( pChip.nChannelNumber ); }
 
 		protected override void tUpdateAndDraw_Chip_Drums( CConfigIni configIni, ref CDTX dTX, ref CChip pChip )
 		{
@@ -3448,7 +3449,6 @@ namespace DTXMania
 				{
 					pChip.bHit = true;
 					this.actLaneFlushD.Start( (ELane) indexSevenLanes, ( (float) CInputManager.n通常音量 ) / 127f );
-					if ( bNotationView ) this.actNotation.tLaneHit( pChip.nChannelNumber );
 					bool flag = this.bInFillIn;
 					bool flag2 = this.bInFillIn && this.bフィルイン区間の最後のChipである( pChip );
 					//bool flag3 = flag2;

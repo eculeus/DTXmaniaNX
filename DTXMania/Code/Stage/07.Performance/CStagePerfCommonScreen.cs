@@ -1444,6 +1444,10 @@ namespace DTXMania
                         int nInputAdjustTime = bPChipIsAutoPlay ? 0 : this.nInputAdjustTimeMs.Drums;
                         eJudgeResult = (bCorrectLane) ? this.e指定時刻からChipのJUDGEを返す(nHitTime, pChip, nInputAdjustTime) : EJudgement.Miss;
                         this.actJudgeString.Start(this.nチャンネル0Atoレーン07[pChip.nChannelNumber - EChannel.HiHatClose], bPChipIsAutoPlay ? EJudgement.Auto : eJudgeResult, pChip.nLag);
+                        // the notation view lights the lane here, so auto-played chips flash too;
+                        // the vertical view's own hook only fires on a real pad hit
+                        if (bNotationView && eJudgeResult != EJudgement.Miss)
+                            this.tNotationLaneHit(pChip);
                     }
                     break;
 
@@ -4634,6 +4638,9 @@ namespace DTXMania
         protected abstract void tUpdateAndDraw_Chip_BarLine(CConfigIni configIni, ref CDTX dTX, ref CChip pChip);
         /// <summary>Drums screen returns true when the horizontal notation view is on.</summary>
         protected virtual bool bNotationView { get { return false; } }
+
+        /// <summary>Light this chip's lane on the notation staff. Only the drums screen does anything.</summary>
+        protected virtual void tNotationLaneHit(CChip pChip) { }
 
         /// <summary>How far ahead (in vertical-lane px) chips are fed to the drawing code. The
         /// notation view spreads them over a much smaller horizontal scale, so it needs more.</summary>
