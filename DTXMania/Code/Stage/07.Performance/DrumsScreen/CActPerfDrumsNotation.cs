@@ -388,6 +388,9 @@ namespace DTXMania
         /// <summary>The lane legend down the left edge. Drawn last so notes never sit on top of it.</summary>
         private void tDrawLaneLabels()
         {
+            // built lazily as well as at activation, so switching NotationView on between songs
+            // still gets a legend even if the actor was not re-activated in between
+            if (this.txLaneLabel == null) tCreateLaneLabels();
             if (this.txLaneLabel == null) return;
             for (int i = 0; i < this.txLaneLabel.Length; i++)
             {
