@@ -720,11 +720,18 @@ namespace DTXMania
                 "The scroll way is reversed. Drums chips flow from the bottom to the top.");
             this.listItems.Add(this.iDrumsReverse);
 
-            this.iDrumsNotationView = new CItemToggle("NotationView", CDTXMania.ConfigIni.bDrumsNotationView,
-                "ONにすると\n" +
-                "ドラム譜面を横スクロールの\n" +
-                "楽譜（五線）表示にします。",
-                "Show the drum chart as scrolling sheet music (staff notation) with a fixed playhead, instead of vertical lanes.");
+            this.iDrumsNotationView = new CItemList("NotationView", CItemBase.EPanelType.Normal, CDTXMania.ConfigIni.nDrumsNotationView,
+                "ドラム譜面を楽譜（五線）で\n" +
+                "表示します。\n" +
+                "  Off  : 通常のレーン表示\n" +
+                "  Scroll: 横スクロール\n" +
+                "  Page : 2段の譜面をめくる",
+                "Show the drum chart as staff notation.\n" +
+                "\n" +
+                " Off   : the usual vertical lanes.\n" +
+                " Scroll: the staff scrolls past a fixed playhead.\n" +
+                " Page  : two fixed staves, a playhead sweeps across and the page turns.",
+                new string[] { "Off", "Scroll", "Page" });
             this.listItems.Add(this.iDrumsNotationView);
 
             this.iDrumsNotationStems = new CItemToggle("NotationStems", CDTXMania.ConfigIni.bDrumsNotationStems,
@@ -3185,7 +3192,7 @@ namespace DTXMania
         private CItemList iDrumsPosition;
         private CItemBase iDrumsReturnToMenu;
         private CItemToggle iDrumsReverse;
-        private CItemToggle iDrumsNotationView;
+        private CItemList iDrumsNotationView;
         private CItemToggle iDrumsNotationStems;
         private CItemInteger iDrumsScrollSpeed;
         private CItemToggle iDrumsSnare;
@@ -3441,7 +3448,7 @@ namespace DTXMania
             this.iDrumsLeftBassDrum.bON = CDTXMania.ConfigIni.bAutoPlay.LBD;
             this.iDrumsScrollSpeed.nCurrentValue = CDTXMania.ConfigIni.nScrollSpeed.Drums;
             this.iDrumsReverse.bON = CDTXMania.ConfigIni.bReverse.Drums;
-            this.iDrumsNotationView.bON = CDTXMania.ConfigIni.bDrumsNotationView;
+            this.iDrumsNotationView.n現在選択されている項目番号 = CDTXMania.ConfigIni.nDrumsNotationView;
             this.iDrumsNotationStems.bON = CDTXMania.ConfigIni.bDrumsNotationStems;
             this.iDrumsPosition.n現在選択されている項目番号 = (int)CDTXMania.ConfigIni.JudgementStringPosition.Drums;
             this.iDrumsTight.bON = CDTXMania.ConfigIni.bTight;
@@ -3648,7 +3655,7 @@ namespace DTXMania
             CDTXMania.ConfigIni.bAutoPlay.LBD = this.iDrumsLeftBassDrum.bON;
             CDTXMania.ConfigIni.nScrollSpeed.Drums = this.iDrumsScrollSpeed.nCurrentValue;
             CDTXMania.ConfigIni.bReverse.Drums = this.iDrumsReverse.bON;
-            CDTXMania.ConfigIni.bDrumsNotationView = this.iDrumsNotationView.bON;
+            CDTXMania.ConfigIni.nDrumsNotationView = this.iDrumsNotationView.n現在選択されている項目番号;
             CDTXMania.ConfigIni.bDrumsNotationStems = this.iDrumsNotationStems.bON;
             CDTXMania.ConfigIni.JudgementStringPosition.Drums = (EType)this.iDrumsPosition.n現在選択されている項目番号;
             CDTXMania.ConfigIni.bTight = this.iDrumsTight.bON;

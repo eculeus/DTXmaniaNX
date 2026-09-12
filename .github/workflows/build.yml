@@ -231,53 +231,69 @@ jobs:
           # and crash startup. Opt in to running silently instead.
           $env:FDK_ALLOW_SILENT_SOUND_DEVICE = '1'
 
-          Write-Host "Launching: $exe `"$dtx`""
-          $proc = Start-Process -FilePath $exe -ArgumentList "`"$dtx`"" -WorkingDirectory $game -PassThru
-          $bounds = [System.Windows.Forms.SystemInformation]::VirtualScreen
-          Write-Host "Desktop is $($bounds.Width)x$($bounds.Height)"
+          # Two runs: the scrolling staff and the page view, so a change to one is visible in the
+          # frames of both. Each run is ~35 s, well inside this step's 5 minute timeout.
+          foreach ($mode in @(1, 2)) {
+            $name = if ($mode -eq 1) { 'scroll' } else { 'page' }
+            $cfgPath = Join-Path $game 'Config.ini'
+            (Get-Content $cfgPath) -replace '^DrumsNotationView=.*', "DrumsNotationView=$mode" |
+              Set-Content $cfgPath -Encoding ASCII
+            Write-Host "=== NotationView=$mode ($name) ==="
+            Write-Host "Launching: $exe `"$dtx`""
+            $proc = Start-Process -FilePath $exe -ArgumentList "`"$dtx`"" -WorkingDirectory $game -PassThru
+            $bounds = [System.Windows.Forms.SystemInformation]::VirtualScreen
+            Write-Host "Desktop is $($bounds.Width)x$($bounds.Height)"
 
-          for ($i = 1; $i -le 24; $i++) {
+            for ($i = 1; $i -le 17; $i++) {
+              Start-Sleep -Seconds 2
+              $proc.Refresh()
+              if ($proc.HasExited) {
+                Write-Host "!! DTXManiaNX exited after $($i * 2)s with code $($proc.ExitCode)"
+                break
+              }
+              $h = $proc.MainWindowHandle
+              $desc = "no window yet"
+              if ($h -ne [IntPtr]::Zero) {
+                $r = New-Object Win32+RECT
+                [void][Win32]::GetWindowRect($h, [ref]$r)
+                $desc = "'$($proc.MainWindowTitle)' rect=($($r.L),$($r.T))-($($r.R),$($r.B)) visible=$([Win32]::IsWindowVisible($h))"
+                [void][Win32]::SetForegroundWindow($h)
+              }
+              Write-Host ("t={0,3}s  {1}" -f ($i * 2), $desc)
+              try {
+                $bmp = New-Object System.Drawing.Bitmap($bounds.Width, $bounds.Height)
+                $g = [System.Drawing.Graphics]::FromImage($bmp)
+                $g.CopyFromScreen($bounds.X, $bounds.Y, 0, 0, $bmp.Size)
+                $g.Dispose()
+                $bmp.Save((Join-Path $shots ("desktop_{0}_{1:D2}.png" -f $name, $i)), [System.Drawing.Imaging.ImageFormat]::Png)
+                $bmp.Dispose()
+              } catch {
+                Write-Host "desktop capture failed: $_"
+              }
+            }
+
+            if (-not $proc.HasExited) { Stop-Process -Id $proc.Id -Force }
             Start-Sleep -Seconds 2
-            $proc.Refresh()
-            if ($proc.HasExited) {
-              Write-Host "!! DTXManiaNX exited after $($i * 2)s with code $($proc.ExitCode)"
-              break
+            Get-Process -Name DTXManiaNX -ErrorAction SilentlyContinue | Stop-Process -Force
+            Start-Sleep -Seconds 1
+
+            $raw = Join-Path $game 'Capture_img'
+            $dest = Join-Path $game ("Capture_img_" + $name)
+            Write-Host "=== Capture_img ($name) ==="
+            $frames = @(Get-ChildItem $raw -ErrorAction SilentlyContinue)
+            $frames | Select-Object Name, Length | Format-Table | Out-String | Write-Host
+            # A run that never rendered still "passes" every step above, so say so loudly here.
+            if ($frames.Count -lt 2) {
+              throw "the $name run rendered $($frames.Count) frame(s) - see DTXManiaLog.txt in the smoke-screenshots artifact"
             }
-            $h = $proc.MainWindowHandle
-            $desc = "no window yet"
-            if ($h -ne [IntPtr]::Zero) {
-              $r = New-Object Win32+RECT
-              [void][Win32]::GetWindowRect($h, [ref]$r)
-              $desc = "'$($proc.MainWindowTitle)' rect=($($r.L),$($r.T))-($($r.R),$($r.B)) visible=$([Win32]::IsWindowVisible($h))"
-              [void][Win32]::SetForegroundWindow($h)
-            }
-            Write-Host ("t={0,3}s  {1}" -f ($i * 2), $desc)
-            try {
-              $bmp = New-Object System.Drawing.Bitmap($bounds.Width, $bounds.Height)
-              $g = [System.Drawing.Graphics]::FromImage($bmp)
-              $g.CopyFromScreen($bounds.X, $bounds.Y, 0, 0, $bmp.Size)
-              $g.Dispose()
-              $bmp.Save((Join-Path $shots ("desktop_{0:D2}.png" -f $i)), [System.Drawing.Imaging.ImageFormat]::Png)
-              $bmp.Dispose()
-            } catch {
-              Write-Host "desktop capture failed: $_"
+            Write-Host "$($frames.Count) frames captured from the game's own back buffer (1280x720)."
+            if (Test-Path $dest) { Remove-Item $dest -Recurse -Force }
+            Move-Item $raw $dest
+            Copy-Item $cfgPath (Join-Path $game ("Config_" + $name + ".ini")) -Force
+            if (Test-Path (Join-Path $game 'DTXManiaLog.txt')) {
+              Copy-Item (Join-Path $game 'DTXManiaLog.txt') (Join-Path $game ("DTXManiaLog_" + $name + ".txt")) -Force
             }
           }
-
-          Write-Host "=== Windows on the desktop ==="
-          Get-Process | Where-Object { $_.MainWindowTitle } | Select-Object ProcessName, MainWindowTitle | Format-Table | Out-String | Write-Host
-
-          if (-not $proc.HasExited) { Stop-Process -Id $proc.Id -Force }
-          Start-Sleep -Seconds 2
-          Get-Process -Name DTXManiaNX -ErrorAction SilentlyContinue | Stop-Process -Force
-          Write-Host "=== Capture_img ==="
-          $frames = @(Get-ChildItem (Join-Path $game 'Capture_img') -ErrorAction SilentlyContinue)
-          $frames | Select-Object Name, Length | Format-Table | Out-String | Write-Host
-          # A run that never rendered still "passes" every step above, so say so loudly here.
-          if ($frames.Count -lt 2) {
-            throw "the game rendered $($frames.Count) frame(s) - see DTXManiaLog.txt in the smoke-screenshots artifact"
-          }
-          Write-Host "$($frames.Count) frames captured from the game's own back buffer (1280x720)."
 
       - name: Show DTXManiaLog.txt
         if: always()
@@ -295,7 +311,7 @@ jobs:
           if-no-files-found: warn
           path: |
             screenshots/**
-            game/Capture_img/**
-            game/DTXManiaLog.txt
-            game/Config.ini
+            game/Capture_img*/**
+            game/DTXManiaLog*.txt
+            game/Config*.ini
             song/smoke.dtx
