@@ -1596,6 +1596,18 @@ namespace DTXMania
                                             break;
                                         continue;
                                 }
+                                // Notation view draws both crashes on one row, so the two crash pads are paired
+                                // here: if this pad found nothing of its own under the usual group rules, let
+                                // it take the other crash's chip. Additive: no existing group semantics move.
+                                if (!bHitted && bNotationView)
+                                {
+                                    CChip chipPaired = this.r指定時刻に一番近い未ヒットChip(nTime, 0x1a, nInputAdjustTime);
+                                    if ((chipPaired != null) && (this.e指定時刻からChipのJUDGEを返す(nTime, chipPaired, nInputAdjustTime) != EJudgement.Miss))
+                                    {
+                                        this.tProcessDrumHit(nTime, EPad.CY, chipPaired, inputEvent.nVelocity);
+                                        continue;
+                                    }
+                                }
                                 if (!bHitted)
                                     break;
                                 continue;
@@ -1960,6 +1972,18 @@ namespace DTXMania
                                             break;
                                         continue;
                                         #endregion
+                                }
+                                // Notation view draws both crashes on one row, so the two crash pads are paired
+                                // here: if this pad found nothing of its own under the usual group rules, let
+                                // it take the other crash's chip. Additive: no existing group semantics move.
+                                if (!bHitted && bNotationView)
+                                {
+                                    CChip chipPaired = this.r指定時刻に一番近い未ヒットChip(nTime, 0x16, nInputAdjustTime);
+                                    if ((chipPaired != null) && (this.e指定時刻からChipのJUDGEを返す(nTime, chipPaired, nInputAdjustTime) != EJudgement.Miss))
+                                    {
+                                        this.tProcessDrumHit(nTime, EPad.LC, chipPaired, inputEvent.nVelocity);
+                                        continue;
+                                    }
                                 }
                                 if (!bHitted)
                                     break;

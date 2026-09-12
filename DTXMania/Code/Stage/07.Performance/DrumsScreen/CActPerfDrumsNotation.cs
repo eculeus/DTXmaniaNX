@@ -157,9 +157,8 @@ namespace DTXMania
                           C_DARK  = 6,      // band background
                           C_PLAYHEAD = 7,
                           C_KICK  = 8,      // 240,240,240 kick and left bass drum
-                          C_CRASH_R = 9,    // 255,150,30  right crash   ) the two crashes are the deliberate
-                          C_CRASH_L = 10;   // 255,61,140  left crash    ) exception to the limb rule: they sit
-                                            //   one ledger line apart and would otherwise be two yellow x heads
+                          C_CRASH = 9;      // 255,61,140  crash: both crashes share one row, so this is the
+                                            //   deliberate exception to the limb rule
 
         private CTexture tx;
 
@@ -219,11 +218,11 @@ namespace DTXMania
             { EChannel.HiHatClose,   new STNote( 9, SHAPE_X,        C_RIGHT, true ) },
             { EChannel.HiHatOpen,    new STNote( 9, SHAPE_CIRCLE_X, C_RIGHT, true ) },
             { EChannel.RideCymbal,   new STNote( 8, SHAPE_DIAMOND,  C_RIGHT, true ) },
-            { EChannel.Cymbal,       new STNote(10, SHAPE_BOLD_X,   C_CRASH_R, true ) },
+            { EChannel.Cymbal,       new STNote(10, SHAPE_BOLD_X,   C_CRASH, true ) },
             { EChannel.FloorTom,     new STNote( 3, SHAPE_HEAD,     C_PURPLE,true ) },
             { EChannel.BassDrum,     new STNote( 1, SHAPE_HEAD,     C_KICK,  false) },
             { EChannel.Snare,        new STNote( 5, SHAPE_HEAD,     C_LEFT,  true ) },
-            { EChannel.LeftCymbal,   new STNote(12, SHAPE_X,        C_CRASH_L, true ) },
+            { EChannel.LeftCymbal,   new STNote(10, SHAPE_BOLD_X,   C_CRASH, true ) },   // one crash row, like Melodics
             { EChannel.LeftPedal,    new STNote(-1, SHAPE_X,        C_LEFT,  false) },
             { EChannel.LeftBassDrum, new STNote( 1, SHAPE_HEAD,     C_KICK,  false) },
             { EChannel.HighTom,      new STNote( 7, SHAPE_HEAD,     C_GREEN, true ) },
@@ -242,14 +241,14 @@ namespace DTXMania
         // Indexed exactly like CStagePerfCommonScreen.nチャンネル0Atoレーン07 / ELane.
         private static readonly STLaneLabel[] stLaneLabels = new STLaneLabel[]
         {
-            new STLaneLabel(12, C_CRASH_L, "L.CRASH"),        // 0  LC
+            new STLaneLabel(10, C_CRASH, ""       ),        // merged into the CRASH row below        // 0  LC
             new STLaneLabel( 9, C_RIGHT, "HI-HAT" ),        // 1  HH (and open hi-hat)
             new STLaneLabel( 5, C_LEFT,  "SNARE"  ),        // 2  SD
             new STLaneLabel( 1, C_KICK,  "KICK"   ),        // 3  BD
             new STLaneLabel( 7, C_GREEN, "HI TOM" ),        // 4  HT
             new STLaneLabel( 6, C_RED,   "LO TOM" ),        // 5  LT
             new STLaneLabel( 3, C_PURPLE,"FLOOR"  ),        // 6  FT
-            new STLaneLabel(10, C_CRASH_R, "CRASH"  ),        // 7  CY
+            new STLaneLabel(10, C_CRASH, "CRASH"  ),        // 7  CY
             new STLaneLabel(-1, C_LEFT,  "L.PEDAL"),        // 8  LP (and left bass drum)
             new STLaneLabel( 8, C_RIGHT, "RIDE"   ),        // 9  RD
         };
@@ -322,7 +321,7 @@ namespace DTXMania
             }
             for (int i = 0; i < stLaneLabels.Length; i++)
             {
-                if (!bLaneIsUsed(i)) continue;
+                if (stLaneLabels[i].strText.Length == 0 || !bLaneIsUsed(i)) continue;
                 try
                 {
                     using (Bitmap bmp = this.pfLabel.DrawPrivateFont(stLaneLabels[i].strText, colLane(stLaneLabels[i].nColour), Color.Black))
@@ -361,8 +360,7 @@ namespace DTXMania
                 case C_RED:    return Color.FromArgb(255,  72,  72);
                 case C_PURPLE: return Color.FromArgb(173, 125, 255);
                 case C_KICK:   return Color.FromArgb(240, 240, 240);
-                case C_CRASH_R:return Color.FromArgb(255, 150,  30);
-                case C_CRASH_L:return Color.FromArgb(255,  61, 140);
+                case C_CRASH:  return Color.FromArgb(255,  61, 140);
                 default:       return Color.White;
             }
         }
@@ -531,6 +529,7 @@ namespace DTXMania
                 if (chip.nPlaybackPosition < nStartPos) continue;
                 STNote note;
                 if (!mapNotes.TryGetValue(chip.nChannelNumber, out note)) continue;
+                if (bAlreadyOnThisBeat(chip.nPlaybackPosition, note.nPos)) continue;
 
                 STPendingNote pending;
                 pending.x = nPageX(chip.nPlaybackPosition - nStartPos, nTicksPerLine);
@@ -606,10 +605,17 @@ namespace DTXMania
                 CTexture txLabel = this.txLaneLabel[i];
                 if (txLabel == null) continue;
                 int y = nBaseY - stLaneLabels[i].nPos * nStep;
+                // the labels are rendered once at scroll size; page mode packs the lanes closer, so
+                // they are drawn scaled to that system's spacing or consecutive rows would collide
+                float fLabel = this.nSpace / (float)STAFF_SPACE;
+                int nLabelW = (int)(txLabel.szImageSize.Width * fLabel);
+                int nLabelH = (int)(txLabel.szImageSize.Height * fLabel);
                 txLabel.nTransparency = 255;
-                int nLabelX = LABEL_GUTTER_W - LABEL_RIGHT_PAD - txLabel.szImageSize.Width;
+                txLabel.vcScaleRatio = new Vector3(fLabel, fLabel, 1f);
+                int nLabelX = LABEL_GUTTER_W - LABEL_RIGHT_PAD - nLabelW;
                 if (nLabelX < 2) nLabelX = 2;
-                txLabel.tDraw2D(CDTXMania.app.Device, nLabelX, y - txLabel.szImageSize.Height / 2);
+                txLabel.tDraw2D(CDTXMania.app.Device, nLabelX, y - nLabelH / 2);
+                txLabel.vcScaleRatio = new Vector3(1f, 1f, 1f);
             }
         }
 
@@ -621,6 +627,8 @@ namespace DTXMania
             if (!mapNotes.TryGetValue(pChip.nChannelNumber, out note)) return;
             int x = nX(pChip.nDistanceFromBar.Drums);
             if (x < LABEL_GUTTER_W || x > 1280 + CELL) return;   // played notes slide away behind the legend
+
+            if (bAlreadyOnThisBeat(pChip.nPlaybackPosition, note.nPos)) return;
 
             STPendingNote pending;
             pending.x = x;
@@ -788,6 +796,20 @@ namespace DTXMania
                 case SHAPE_DIAMOND:  return nCell * 244 / 640;   // 48 -> 18  (right vertex)
                 default:             return nCell * 252 / 640;   // 48 -> 18  (ellipse)
             }
+        }
+
+        /// <summary>
+        /// Is this staff position already taken at this instant? Both crashes live on one row, so a
+        /// chart that has them together would otherwise stack two heads in the same place.
+        /// </summary>
+        private bool bAlreadyOnThisBeat(int nPlaybackPosition, int nPos)
+        {
+            for (int i = this.listNotes.Count - 1; i >= 0; i--)
+            {
+                if (this.listNotes[i].nPlaybackPosition != nPlaybackPosition) return false;
+                if (this.listNotes[i].note.nPos == nPos) return true;
+            }
+            return false;
         }
 
         /// <summary>Beams per stem for a gap in playback ticks: 48 = eighths, 24 = sixteenths, 12 = 32nds.</summary>
