@@ -38,13 +38,13 @@ namespace DTXMania
                                                                     // ledger line, and the beams sit on that line
         public const int STEM_BOTTOM_Y = STAFF_BOTTOM_Y + 80;       // 460: every down-stem ends here
         public const int BAR_NUMBER_Y = 4;                          // bar number text, along the band top
-        public const double X_SCALE = 0.66;                         // horizontal px per vertical-lane px.
+        public const double X_SCALE = 0.80;                         // horizontal px per vertical-lane px.
                                                                     // The engine gives us (SPEED * 0.3575) lane px
                                                                     // per ms, so at the SPEED 2.0 setting this shows
-                                                                    // 940/(0.66*0.3575) = 4000 ms ahead = two 4/4
-                                                                    // bars at 120 BPM. The in-game SPEED setting
-                                                                    // still scales it: SPEED 1.0 shows twice as
-                                                                    // much, SPEED 4.0 half as much.
+                                                                    // 940/(0.80*0.3575) = 3290 ms ahead, about 1.65
+                                                                    // bars of 4/4 at 120 BPM, with eighths 72 px
+                                                                    // apart. The in-game SPEED setting still scales
+                                                                    // it: SPEED 1.0 shows twice as much, 4.0 half.
         public const int LOOKAHEAD_PX = 1500;                       // the chip loop normally stops feeding us chips
                                                                     // past 600 lane px, which at this X_SCALE would
                                                                     // leave the right half of the band empty
@@ -85,21 +85,21 @@ namespace DTXMania
         public const float JUDGE_SCALE = 0.8f;
 
         // Sizes derived from the staff spacing (36 px).
-        private const int HEAD_W = 54;              // round notehead cell -> 42 x 32 px head (1.2 x 0.9 spaces)
-        private const int XHEAD_W = 50;             // x notehead cell     -> 46 px wide, 6.7 px strokes
-        private const int CIRCLEX_W = 54;           // circled x (open hi-hat)
+        private const int HEAD_W = 48;              // round notehead cell -> 38 x 29 px head (1.05 x 0.8 spaces)
+        private const int XHEAD_W = 40;             // x notehead cell     -> 36 px = one space, 4.5 px strokes
+        private const int CIRCLEX_W = 42;           // circled x (open hi-hat) -> 37 px ring, matching the x
         private const int STEM_W = 4;
         private const int STEM_BITE = 4;            // round heads: the stem is set this far inside the right edge
-        private const int LEDGER_W = 62;
+        private const int LEDGER_W = 54;
         private const int LEDGER_H = 4;
         private const int LINE_H = 3;               // staff line thickness
         private const int BAR_LINE_LEAD = 20;       // bar / beat lines are drawn this far left of the
                                                     // notes on that beat, so they never run through a head
-        private const int MIN_STEM_LEN = 2 * STAFF_SPACE;   // a note close to STEM_TOP_Y (the left crash on its
-                                                            // second ledger line) pushes its own stem up so it
-                                                            // never ends up a stub
-        private const int BEAM_H = 6;
-        private const int BEAM_GAP = 11;
+        private const int MIN_STEM_LEN = 8;         // a note sitting at the beam line (the left crash on its
+                                                    // second ledger line) keeps a short nub of a stem rather
+                                                    // than pushing a lone spike above the beams
+        private const int BEAM_H = 5;
+        private const int BEAM_GAP = 10;
         private const bool BEAMS = true;            // join notes of the same beat with a beam
 
         // Lane legend down the left edge of the band: one column, one label per lane. At 36 px
@@ -107,14 +107,15 @@ namespace DTXMania
         private const int LABEL_X = 8;
         private const int LABEL_GUTTER_W = 150;     // darker strip the legend sits on; the staff lines and the
                                                     // playhead region start after it so nothing strikes the text
-        private const int LABEL_FONT_SIZE = 13;     // points -> about 17 px of glyph
+        private const int LABEL_FONT_SIZE = 15;     // points -> about 14 px of capital, which still clears
+                                                    // the 18 px between two lane positions
 
         // Hit feedback: the lane the player just hit lights up across the part of the band that has
         // already gone by, plus a glow at the playhead, fading out over LANE_FLASH_MS.
         private const int LANE_FLASH_MS = 150;
         private const int LANE_FLASH_ALPHA = 120;
         private const int LANE_GLOW_ALPHA = 210;
-        private const int LANE_GLOW_W = 46;
+        private const int LANE_GLOW_W = 40;
         private const int POS_MIN = -1;             // lowest staff position any voice uses (left pedal)
         private const int POS_MAX = 12;             // highest (left crash on its second ledger line)
 
@@ -525,7 +526,7 @@ namespace DTXMania
         /// <summary>
         /// Where a stem meets this head, as a distance from the head centre. The sprite cells do not
         /// fill their 64 px box: the ellipse and diamond reach 25.2/32 of the half cell, the circled
-        /// x's ring 28.6/32, and an x head's arm *tips* sit at 25.2/32 diagonally (the x has no ink
+        /// x's ring 28.2/32, and an x head's arm *tips* sit at 25.2/32 diagonally (the x has no ink
         /// at the head's own height, which is why its stem attaches at the arm tip instead).
         /// </summary>
         private static int nHeadHalfWidth(int nShape)
@@ -533,9 +534,9 @@ namespace DTXMania
             int nCell = nHeadCell(nShape);
             switch (nShape)
             {
-                case SHAPE_X:        return nCell * 252 / 640;   // 50 -> 19  (arm tip, x and y)
-                case SHAPE_CIRCLE_X: return nCell * 286 / 640;   // 54 -> 24  (ring)
-                default:             return nCell * 252 / 640;   // 54 -> 21  (ellipse / diamond)
+                case SHAPE_X:        return nCell * 252 / 640;   // 40 -> 15  (arm tip, x and y)
+                case SHAPE_CIRCLE_X: return nCell * 282 / 640;   // 42 -> 18  (ring)
+                default:             return nCell * 252 / 640;   // 48 -> 18  (ellipse / diamond)
             }
         }
 
