@@ -228,8 +228,13 @@ jobs:
           New-Item -ItemType Directory -Force -Path $shots | Out-Null
 
           # Opt-in in-game capture: the game writes its own back buffer to Capture_img every 2 s.
-          # Independent of whether the runner's desktop is capturable at all.
+          # Independent of whether the runner's desktop is capturable at all - and the back buffer
+          # is always 1280x720, so these are full-size even though the window is not.
           $env:DTXMANIA_AUTOCAPTURE_MS = '2000'
+          # This runner has no audio endpoint at all: DirectSound fails with DSERR_NODRIVER
+          # (0x88780078) and so does everything else, which used to leave FDK with a null device
+          # and crash startup. Opt in to running silently instead.
+          $env:FDK_ALLOW_SILENT_SOUND_DEVICE = '1'
 
           Write-Host "Launching: $exe `"$dtx`""
           $proc = Start-Process -FilePath $exe -ArgumentList "`"$dtx`"" -WorkingDirectory $game -PassThru
