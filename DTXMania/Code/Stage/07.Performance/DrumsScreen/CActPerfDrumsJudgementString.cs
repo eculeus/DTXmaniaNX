@@ -1277,7 +1277,7 @@ namespace DTXMania
 
                             if (CDTXMania.ConfigIni.bDrumsNotationView && j < 10)
                             {
-                                num5 = CActPerfDrumsNotation.PLAYHEAD_X - (this.stレーンサイズ[j].w / 2);
+                                num5 = CActPerfDrumsNotation.JUDGE_X - (this.stレーンサイズ[j].w / 2);
                                 num6 = CActPerfDrumsNotation.JUDGE_Y;
                             }
                             int nRectX = CDTXMania.ConfigIni.nJudgeWidgh;
@@ -1380,7 +1380,7 @@ namespace DTXMania
 
                             if (CDTXMania.ConfigIni.bDrumsNotationView && j < 10)
                             {
-                                num5 = CActPerfDrumsNotation.PLAYHEAD_X - (this.stレーンサイズ[j].w / 2);
+                                num5 = CActPerfDrumsNotation.JUDGE_X - (this.stレーンサイズ[j].w / 2);
                                 num6 = CActPerfDrumsNotation.JUDGE_Y;
                             }
                             int nRectX = 85;

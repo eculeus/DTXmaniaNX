@@ -90,6 +90,17 @@ namespace DTXMania
             this.actChipFireD.iPosY = (CDTXMania.ConfigIni.bReverse.Drums ? base.nJudgeLinePosY.Drums - 183 : base.nJudgeLinePosY.Drums - 186);
             base.actPlayInfo.jl = (CDTXMania.ConfigIni.bReverse.Drums ? base.nJudgeLinePosY.Drums - 159 : CStagePerfCommonScreen.nJudgeLineMaxPosY - base.nJudgeLinePosY.Drums);
 
+            #region [ notation view: the staff band owns the top of the screen, so move the HUD below it ]
+            if ( bNotationView )
+            {
+                base.actScore.n本体X[ 0 ] = CActPerfDrumsNotation.SCORE_X;
+                base.actScore.n本体Y = CActPerfDrumsNotation.SCORE_Y;
+                this.actProgressBar.tSetHorizontalLayout(
+                    CActPerfDrumsNotation.PROGRESS_X, CActPerfDrumsNotation.PROGRESS_Y,
+                    CActPerfDrumsNotation.PROGRESS_W, CActPerfDrumsNotation.PROGRESS_H );
+            }
+            #endregion
+
 			if( CDTXMania.bCompactMode )
 			{
 				var score = new CScore();
@@ -218,6 +229,7 @@ namespace DTXMania
                 this.tDraw_LoopLines();
                 this.tUpdateAndDraw_Chip_PatternOnly( EInstrumentPart.DRUMS );
                 bIsFinishedPlaying = this.tUpdateAndDraw_Chips( EInstrumentPart.DRUMS );
+                if (bNotationView) this.actNotation.tDrawNotes();
                 this.actProgressBar.OnUpdateAndDraw();
                 #region[ シャッター ]
                 //シャッターを使うのはLC、LP、FT、RDレーンのみ。その他のレーンでは一切使用しない。
@@ -361,13 +373,16 @@ namespace DTXMania
                 //this.actProgressBar.OnUpdateAndDraw();
                 this.tUpdateAndDraw_Gauge();
                 this.tUpdateAndDraw_Combo();
-                this.tUpdateAndDraw_Graph();
+                // the skill graph is 584 px tall and would cut through the notation band
+                if (!bNotationView) this.tUpdateAndDraw_Graph();
                 this.tUpdateAndDraw_PerformanceInformation();
                 this.tUpdateAndDraw_JudgementString1_ForNormalPosition();
                 this.tUpdateAndDraw_JudgementString2_ForPositionOnJudgementLine();
                 if (!bNotationView) this.tUpdateAndDraw_ChipFireD();
                 this.tUpdateAndDraw_PlaySpeed();
-                this.tUpdateAndDraw_SkipIndicator(25, 240);
+                this.tUpdateAndDraw_SkipIndicator(
+                    bNotationView ? CActPerfDrumsNotation.SKIP_X : 25,
+                    bNotationView ? CActPerfDrumsNotation.SKIP_Y : 240);
                 //
                 
                 this.tUpdateAndDraw_STAGEFAILED();
@@ -825,7 +840,10 @@ namespace DTXMania
         {
             if (this.txPlaySpeed != null)
             {
-                this.txPlaySpeed.tDraw2D(CDTXMania.app.Device, 25, 200);
+                if ( bNotationView )
+                    this.txPlaySpeed.tDraw2D(CDTXMania.app.Device, CActPerfDrumsNotation.PLAYSPEED_X, CActPerfDrumsNotation.PLAYSPEED_Y);
+                else
+                    this.txPlaySpeed.tDraw2D(CDTXMania.app.Device, 25, 200);
             }
         }
 

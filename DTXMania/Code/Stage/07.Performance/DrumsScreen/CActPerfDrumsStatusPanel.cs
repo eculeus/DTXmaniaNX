@@ -176,8 +176,9 @@ namespace DTXMania
             }
 
             this.n本体X[0] = 22;
-            this.n本体Y = 250;
-            
+            // notation view puts the staff band across the top of the screen, so drop the panel below it
+            this.n本体Y = CDTXMania.ConfigIni.bDrumsNotationView ? CActPerfDrumsNotation.PANEL_Y : 250;
+
             #endregion
                         
             base.OnActivate();

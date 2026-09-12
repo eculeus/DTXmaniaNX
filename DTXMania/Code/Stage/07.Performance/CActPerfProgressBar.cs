@@ -169,14 +169,124 @@ namespace DTXMania
 				CDTXMania.t安全にDisposeする(ref this.txProgressBarBackgroundDrums);
 				CDTXMania.t安全にDisposeする(ref this.txProgressBarBackgroundGuitar);
 
+				CDTXMania.t安全にDisposeする(ref this.txH背景);
+				CDTXMania.t安全にDisposeする(ref this.txH進捗);
+
 				base.OnManagedReleaseResources();
 			}				
         }
+
+		/// <summary>
+		/// Lay the bar out horizontally at (x, y) with the given size instead of as the usual tall
+		/// vertical bar. Only the drums notation view uses this; vertical-lane mode is untouched.
+		/// </summary>
+		public void tSetHorizontalLayout(int x, int y, int w, int h)
+		{
+			if (b演奏画面以外からの呼び出し)
+			{
+				return;
+			}
+			this.bHorizontal = true;
+			this.nHorizontalX = x;
+			this.nHorizontalY = y;
+			this.nHorizontalW = w;
+			this.nHorizontalH = h;
+			CDTXMania.t安全にDisposeする(ref this.txH背景);
+			CDTXMania.t安全にDisposeする(ref this.txH進捗);
+		}
+
+		private void tHorizontalテクスチャの生成()
+		{
+			using (Bitmap bitmap = new Bitmap(nHorizontalW, nHorizontalH))
+			{
+				using (Graphics graphics = Graphics.FromImage(bitmap))
+				{
+					for (int i = 0; i < nHorizontalH; i += 5)
+					{
+						graphics.FillRectangle(new SolidBrush((i / 5 % 2 == 0) ? Color.FromArgb(255, 10, 10, 10) : Color.FromArgb(255, 14, 14, 14)), 0, i, nHorizontalW, 5);
+					}
+				}
+				txH背景 = CDTXMania.tGenerateTexture(bitmap);
+			}
+			using (Bitmap bitmap2 = new Bitmap(nHorizontalW, nHorizontalH))
+			{
+				using (Graphics graphics2 = Graphics.FromImage(bitmap2))
+				{
+					graphics2.FillRectangle(new SolidBrush(Color.FromArgb(48, Color.White)), 0, 0, nHorizontalW, nHorizontalH);
+					// the bright edge sits at the right of the texture so that, drawn right-aligned,
+					// it always lands on the current playback position
+					graphics2.FillRectangle(new SolidBrush(Color.FromArgb(160, Color.White)), nHorizontalW - 5, 0, 5, nHorizontalH);
+				}
+				txH進捗 = CDTXMania.tGenerateTexture(bitmap2);
+			}
+		}
+
+		private void tUpdateAndDrawHorizontal()
+		{
+			EInstrumentPart ePart = EInstrumentPart.DRUMS;
+			if (!CDTXMania.ConfigIni.bInstrumentAvailable(ePart) || !CDTXMania.DTX.bチップがある[(int)ePart] ||
+				(EDarkMode)CDTXMania.ConfigIni.eDark == EDarkMode.FULL || nLastChipTime <= 0)
+			{
+				return;
+			}
+			if (txH背景 == null || txH進捗 == null)
+			{
+				tHorizontalテクスチャの生成();
+			}
+
+			txH背景.tDraw2D(CDTXMania.app.Device, nHorizontalX, nHorizontalY);
+
+			for (int i = 0; i < nSectionIntervalCount; i++)
+			{
+				CProgressSection c区間 = listProgressSection[(int)ePart][i];
+				int x = nHorizontalX + i * nHorizontalW / nSectionIntervalCount;
+				int x2 = nHorizontalX + (i + 1) * nHorizontalW / nSectionIntervalCount;
+				Rectangle rectangle = new Rectangle(0, 0, x2 - x, nHorizontalH);
+				if (!CDTXMania.ConfigIni.bIsAutoPlay(ePart))
+				{
+					if ((i + 1) * nLastChipTime / nSectionIntervalCount - 1 > ((CTimerBase)CDTXMania.Timer).n現在時刻ms)
+					{
+						tx灰.tDraw2D(CDTXMania.app.Device, x, nHorizontalY, rectangle);
+					}
+					else
+					{
+						c区間.bIsAttempted = true;
+						if (c区間.nChipCount > 0)
+						{
+							if (c区間.nHitCount == c区間.nChipCount)
+							{
+								tx黄.tDraw2D(CDTXMania.app.Device, x, nHorizontalY, rectangle);
+							}
+							else
+							{
+								tx青.tDraw2D(CDTXMania.app.Device, x, nHorizontalY, rectangle);
+							}
+						}
+					}
+				}
+				else if (c区間.nChipCount > 0)
+				{
+					tx灰.tDraw2D(CDTXMania.app.Device, x, nHorizontalY, rectangle);
+				}
+			}
+
+			int num = (int)((double)((CTimerBase)CDTXMania.Timer).n現在時刻ms / (double)nLastChipTime * nHorizontalW);
+			if (num > nHorizontalW) num = nHorizontalW;
+			if (num > 0)
+			{
+				txH進捗.tDraw2D(CDTXMania.app.Device, nHorizontalX, nHorizontalY, new Rectangle(nHorizontalW - num, 0, num, nHorizontalH));
+			}
+		}
 
         public override int OnUpdateAndDraw()
 		{
 			if (!base.bNotActivated)
 			{
+				if (bHorizontal)
+				{
+					tUpdateAndDrawHorizontal();
+					return 0;
+				}
 				//if (base.bJustStartedUpdate)
 				//{
 				//	//Put First time initialization code here
@@ -711,6 +821,20 @@ namespace DTXMania
 		private CTexture txProgressBarBackgroundDrums;
 
 		private CTexture txProgressBarBackgroundGuitar;
+
+		private CTexture txH背景;
+
+		private CTexture txH進捗;
+
+		private bool bHorizontal;
+
+		private int nHorizontalX;
+
+		private int nHorizontalY;
+
+		private int nHorizontalW;
+
+		private int nHorizontalH;
 
 		private STDGBVALUE<Point> p表示位置;
 
