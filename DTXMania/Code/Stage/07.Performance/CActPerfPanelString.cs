@@ -58,8 +58,9 @@ namespace DTXMania
 
             if (CDTXMania.ConfigIni.bDrumsEnabled)
             {
-                this.n曲名X = 950;
-                this.n曲名Y = 630;
+                // notation view: under the (smaller) picture-in-picture movie, bottom right
+                this.n曲名X = CDTXMania.ConfigIni.bDrumsNotationView ? CActPerfDrumsNotation.TITLE_X : 950;
+                this.n曲名Y = CDTXMania.ConfigIni.bDrumsNotationView ? CActPerfDrumsNotation.TITLE_Y : 630;
             }
             else if (CDTXMania.ConfigIni.bGuitarEnabled)
             {

@@ -175,9 +175,12 @@ namespace DTXMania
                 this.n本体X[i] = 0;
             }
 
-            this.n本体X[0] = 22;
-            // notation view puts the staff band across the top of the screen, so drop the panel below it
-            this.n本体Y = CDTXMania.ConfigIni.bDrumsNotationView ? CActPerfDrumsNotation.PANEL_Y : 250;
+            // notation view puts the staff band across the top 65% of the screen, so the panel is
+            // drawn scaled down in the bottom left corner
+            bool bNotation = CDTXMania.ConfigIni.bDrumsNotationView;
+            this.fScale = bNotation ? CActPerfDrumsNotation.PANEL_SCALE : 1f;
+            this.n本体X[0] = bNotation ? CActPerfDrumsNotation.PANEL_X : 22;
+            this.n本体Y = bNotation ? CActPerfDrumsNotation.PANEL_Y : 250;
 
             #endregion
                         
@@ -357,15 +360,16 @@ namespace DTXMania
                     bCLASSIC = true;
                 }
 
+                if (this.fScale != 1f) tApplyScale(this.fScale);
                 this.txスキルパネル.tDraw2D(CDTXMania.app.Device, this.n本体X[i], this.n本体Y);
                 this.txネームプレート用文字.tDraw2D(CDTXMania.app.Device, this.n本体X[i], this.n本体Y);
 
-                this.t小文字表示(80 + this.n本体X[i], 72 + this.n本体Y, string.Format("{0,4:###0}", CDTXMania.stagePerfDrumsScreen.nHitCount_ExclAuto[i].Perfect));
-                this.t小文字表示(80 + this.n本体X[i], 102 + this.n本体Y, string.Format("{0,4:###0}", CDTXMania.stagePerfDrumsScreen.nHitCount_ExclAuto[i].Great));
-                this.t小文字表示(80 + this.n本体X[i], 132 + this.n本体Y, string.Format("{0,4:###0}", CDTXMania.stagePerfDrumsScreen.nHitCount_ExclAuto[i].Good));
-                this.t小文字表示(80 + this.n本体X[i], 162 + this.n本体Y, string.Format("{0,4:###0}", CDTXMania.stagePerfDrumsScreen.nHitCount_ExclAuto[i].Poor));
-                this.t小文字表示(80 + this.n本体X[i], 192 + this.n本体Y, string.Format("{0,4:###0}", CDTXMania.stagePerfDrumsScreen.nHitCount_ExclAuto[i].Miss));
-                this.t小文字表示(80 + this.n本体X[i], 222 + this.n本体Y, string.Format("{0,4:###0}", CDTXMania.stagePerfDrumsScreen.actCombo.nCurrentCombo.HighestValue[i]));
+                this.t小文字表示(this.n本体X[i] + nS(80), this.n本体Y + nS(72), string.Format("{0,4:###0}", CDTXMania.stagePerfDrumsScreen.nHitCount_ExclAuto[i].Perfect));
+                this.t小文字表示(this.n本体X[i] + nS(80), this.n本体Y + nS(102), string.Format("{0,4:###0}", CDTXMania.stagePerfDrumsScreen.nHitCount_ExclAuto[i].Great));
+                this.t小文字表示(this.n本体X[i] + nS(80), this.n本体Y + nS(132), string.Format("{0,4:###0}", CDTXMania.stagePerfDrumsScreen.nHitCount_ExclAuto[i].Good));
+                this.t小文字表示(this.n本体X[i] + nS(80), this.n本体Y + nS(162), string.Format("{0,4:###0}", CDTXMania.stagePerfDrumsScreen.nHitCount_ExclAuto[i].Poor));
+                this.t小文字表示(this.n本体X[i] + nS(80), this.n本体Y + nS(192), string.Format("{0,4:###0}", CDTXMania.stagePerfDrumsScreen.nHitCount_ExclAuto[i].Miss));
+                this.t小文字表示(this.n本体X[i] + nS(80), this.n本体Y + nS(222), string.Format("{0,4:###0}", CDTXMania.stagePerfDrumsScreen.actCombo.nCurrentCombo.HighestValue[i]));
 
                 int n現在のノーツ数 =
                     CDTXMania.stagePerfDrumsScreen.nHitCount_IncAuto[i].Perfect +
@@ -401,24 +405,24 @@ namespace DTXMania
                 if (double.IsNaN(dbMAXCOMBO率))
                     dbMAXCOMBO率 = 0;
 
-                this.t小文字表示(167 + this.n本体X[i], 72 + this.n本体Y, string.Format("{0,3:##0}%", dbPERFECT率));
-                this.t小文字表示(167 + this.n本体X[i], 102 + this.n本体Y, string.Format("{0,3:##0}%", dbGREAT率));
-                this.t小文字表示(167 + this.n本体X[i], 132 + this.n本体Y, string.Format("{0,3:##0}%", dbGOOD率));
-                this.t小文字表示(167 + this.n本体X[i], 162 + this.n本体Y, string.Format("{0,3:##0}%", dbPOOR率));
-                this.t小文字表示(167 + this.n本体X[i], 192 + this.n本体Y, string.Format("{0,3:##0}%", dbMISS率));
-                this.t小文字表示(167 + this.n本体X[i], 222 + this.n本体Y, string.Format("{0,3:##0}%", dbMAXCOMBO率));
+                this.t小文字表示(this.n本体X[i] + nS(167), this.n本体Y + nS(72), string.Format("{0,3:##0}%", dbPERFECT率));
+                this.t小文字表示(this.n本体X[i] + nS(167), this.n本体Y + nS(102), string.Format("{0,3:##0}%", dbGREAT率));
+                this.t小文字表示(this.n本体X[i] + nS(167), this.n本体Y + nS(132), string.Format("{0,3:##0}%", dbGOOD率));
+                this.t小文字表示(this.n本体X[i] + nS(167), this.n本体Y + nS(162), string.Format("{0,3:##0}%", dbPOOR率));
+                this.t小文字表示(this.n本体X[i] + nS(167), this.n本体Y + nS(192), string.Format("{0,3:##0}%", dbMISS率));
+                this.t小文字表示(this.n本体X[i] + nS(167), this.n本体Y + nS(222), string.Format("{0,3:##0}%", dbMAXCOMBO率));
 
-                //this.tDrawStringLarge(58 + this.n本体X[i], 277 + this.n本体Y, string.Format("{0,6:##0.00}", CDTXMania.stagePerfDrumsScreen.actStatusPanel.db現在の達成率.Drums ) );
+                //this.tDrawStringLarge(this.n本体X[i] + nS(58), this.n本体Y + nS(277), string.Format("{0,6:##0.00}", CDTXMania.stagePerfDrumsScreen.actStatusPanel.db現在の達成率.Drums ) );
                 //Conditional checks for MAX
                 if (this.txSkillMax != null && CDTXMania.stagePerfDrumsScreen.actStatusPanel.db現在の達成率.Drums >= 100.0)
                 {
-                    this.txSkillMax.tDraw2D(CDTXMania.app.Device, 127 + this.n本体X[i], 277 + this.n本体Y);
+                    this.txSkillMax.tDraw2D(CDTXMania.app.Device, this.n本体X[i] + nS(127), this.n本体Y + nS(277));
                 }
                 else
                 {
-                    this.t大文字表示(58 + this.n本体X[i], 277 + this.n本体Y, string.Format("{0,6:##0.00}", CDTXMania.stagePerfDrumsScreen.actStatusPanel.db現在の達成率.Drums));
+                    this.t大文字表示(this.n本体X[i] + nS(58), this.n本体Y + nS(277), string.Format("{0,6:##0.00}", CDTXMania.stagePerfDrumsScreen.actStatusPanel.db現在の達成率.Drums));
                     if (this.txPercent != null)
-                        this.txPercent.tDraw2D(CDTXMania.app.Device, 217 + this.n本体X[i], 287 + this.n本体Y);
+                        this.txPercent.tDraw2D(CDTXMania.app.Device, this.n本体X[i] + nS(217), this.n本体Y + nS(287));
                 }
 
                 //Draw Lag Counters if Lag Display is on
@@ -427,24 +431,26 @@ namespace DTXMania
                     //Type-A is Early-Blue, Late-Red
                     bool bTypeAColor = CDTXMania.ConfigIni.nShowLagTypeColor == 0;
 
-                    this.tDrawLagCounterText(this.n本体X[i] + 170, this.n本体Y + 335,
+                    this.tDrawLagCounterText(this.n本体X[i] + nS(170), this.n本体Y + nS(335),
                         string.Format("{0,4:###0}", CDTXMania.stagePerfDrumsScreen.nTimingHitCount[i].nEarly), !bTypeAColor);
-                    this.tDrawLagCounterText(this.n本体X[i] + 245, this.n本体Y + 335,
+                    this.tDrawLagCounterText(this.n本体X[i] + nS(245), this.n本体Y + nS(335),
                         string.Format("{0,4:###0}", CDTXMania.stagePerfDrumsScreen.nTimingHitCount[i].nLate), bTypeAColor);
                 }
 
                 if (bCLASSIC)
                 {
-                    this.t大文字表示(88 + this.n本体X[i], 363 + this.n本体Y, string.Format("{0,6:##0.00}", CDTXMania.stagePerfDrumsScreen.actStatusPanel.db現在の達成率.Drums * (CDTXMania.DTX.LEVEL[i] * 0.0033) ));
+                    this.t大文字表示(this.n本体X[i] + nS(88), this.n本体Y + nS(363), string.Format("{0,6:##0.00}", CDTXMania.stagePerfDrumsScreen.actStatusPanel.db現在の達成率.Drums * (CDTXMania.DTX.LEVEL[i] * 0.0033) ));
                 }
                 else
                 {
-                    this.t大文字表示(88 + this.n本体X[i], 363 + this.n本体Y, string.Format("{0,6:##0.00}", CScoreIni.tCalculateGameSkillFromPlayingSkill(CDTXMania.DTX.LEVEL[i], CDTXMania.DTX.LEVELDEC[i], CDTXMania.stagePerfDrumsScreen.actStatusPanel.db現在の達成率.Drums)));
+                    this.t大文字表示(this.n本体X[i] + nS(88), this.n本体Y + nS(363), string.Format("{0,6:##0.00}", CScoreIni.tCalculateGameSkillFromPlayingSkill(CDTXMania.DTX.LEVEL[i], CDTXMania.DTX.LEVELDEC[i], CDTXMania.stagePerfDrumsScreen.actStatusPanel.db現在の達成率.Drums)));
                 }
 
                 if ( this.tx難易度パネル != null )
-                    this.tx難易度パネル.tDraw2D( CDTXMania.app.Device, 14 + this.n本体X[ i ], 266 + this.n本体Y, new Rectangle( base.rectDiffPanelPoint.X, base.rectDiffPanelPoint.Y, 60, 60 ) );
-                this.tレベル数字描画((bCLASSIC == true ? 26 : 18) + this.n本体X[i], 290 + this.n本体Y, str);
+                    this.tx難易度パネル.tDraw2D( CDTXMania.app.Device, this.n本体X[i] + nS(14), this.n本体Y + nS(266), new Rectangle( base.rectDiffPanelPoint.X, base.rectDiffPanelPoint.Y, 60, 60 ) );
+                this.tレベル数字描画(this.n本体X[i] + nS(bCLASSIC == true ? 26 : 18), this.n本体Y + nS(290), str);
+
+                if (this.fScale != 1f) tApplyScale(1f);
             }
             return 0;
 
@@ -472,6 +478,24 @@ namespace DTXMania
         private CPrivateFastFont prv称号フォント;
         private string strPlayerName;
         private string strTitleName;
+
+        private float fScale = 1f;
+
+        /// <summary>Scale a panel-relative offset. Identity unless the notation view shrank the panel.</summary>
+        private int nS(int nOffset)
+        {
+            return (int)(nOffset * this.fScale);
+        }
+
+        /// <summary>Put every texture the panel draws at the panel scale (or back to 1:1).</summary>
+        private void tApplyScale(float f)
+        {
+            CTexture[] txAll = new CTexture[] { this.txスキルパネル, this.txネームプレート用文字, this.txパネル文字[0],
+                                                this.txパネル文字[1], this.txSkillMax, this.txPercent,
+                                                this.tx難易度パネル, this.tx難易度用数字, this.txLagHitCount };
+            for (int i = 0; i < txAll.Length; i++)
+                if (txAll[i] != null) txAll[i].vcScaleRatio = new Vector3(f, f, 1f);
+        }
         private CTexture txネームプレート用文字;
         private CTexture tx難易度パネル;
         private CTexture tx難易度用数字;
@@ -496,7 +520,7 @@ namespace DTXMania
                         break;
                     }
                 }
-                x += 20;
+                x += nS(20);
             }
         }
 
@@ -520,13 +544,13 @@ namespace DTXMania
 
                         if (this.txLagHitCount != null)
                         {
-                            this.txLagHitCount.tDraw2D(CDTXMania.app.Device, x - currTextPosStructArray[i].rect.Width, y, rectangle);
+                            this.txLagHitCount.tDraw2D(CDTXMania.app.Device, x - nS(currTextPosStructArray[i].rect.Width), y, rectangle);
                         }
                         break;
                     }
                 }
                 //15 is width of char in txLag
-                x -= 15;
+                x -= nS(15);
             }
         }
         private void t大文字表示(int x, int y, string str)
@@ -549,7 +573,7 @@ namespace DTXMania
                         break;
                     }
                 }
-                x += (ch == '.' ? 12 : 29);
+                x += nS(ch == '.' ? 12 : 29);
             }
         }
         private void tレベル数字描画(int x, int y, string str)
@@ -572,7 +596,7 @@ namespace DTXMania
                         break;
                     }
                 }
-                x += (ch == '.' ? 5 : 16);
+                x += nS(ch == '.' ? 5 : 16);
             }
         }
         //-----------------

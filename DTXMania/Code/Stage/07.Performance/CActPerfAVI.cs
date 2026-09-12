@@ -712,30 +712,41 @@ namespace DTXMania
                         else
                         {
                             #region[ スキルメーター無効 ]
-                            this.n本体X = CDTXMania.ConfigIni.bDrumsNotationView ? CActPerfDrumsNotation.MOVIE_X : 854;
-                            this.n本体Y = CDTXMania.ConfigIni.bDrumsNotationView ? CActPerfDrumsNotation.MOVIE_Y : 142;
+                            // notation view shrinks the whole clip panel so it fits in the HUD strip
+                            bool bNotationClip = CDTXMania.ConfigIni.bDrumsNotationView;
+                            float fClipScale = bNotationClip ? CActPerfDrumsNotation.MOVIE_SCALE : 1f;
+                            float fClipW = 416f * fClipScale;
+                            float fClipH = 234f * fClipScale;
+                            int nClipInsetX = (int)(5 * fClipScale);
+                            int nClipInsetY = (int)(30 * fClipScale);
+                            this.n本体X = bNotationClip ? CActPerfDrumsNotation.MOVIE_X : 854;
+                            this.n本体Y = bNotationClip ? CActPerfDrumsNotation.MOVIE_Y : 142;
 
                             if( this.fClipアスペクト比 > 1.77f )
                             {
-                                this.ratio2 = 416f / ((float)this.framewidth);
-                                this.position2 = 30 + this.n本体Y + (int)((234f - (this.frameheight * this.ratio2)) / 2f);
+                                this.ratio2 = fClipW / ((float)this.framewidth);
+                                this.position2 = nClipInsetY + this.n本体Y + (int)((fClipH - (this.frameheight * this.ratio2)) / 2f);
                             }
                             else
                             {
-                                this.ratio2 = 234f / ((float)this.frameheight);
-                                this.position2 = 5 + this.n本体X + (int)((416f - (this.framewidth * this.ratio2)) / 2f);
+                                this.ratio2 = fClipH / ((float)this.frameheight);
+                                this.position2 = nClipInsetX + this.n本体X + (int)((fClipW - (this.framewidth * this.ratio2)) / 2f);
                             }
                             if( this.txクリップパネル != null )
-                                this.txクリップパネル.tDraw2D( CDTXMania.app.Device, this.n本体X, this.n本体Y ); 
+                            {
+                                this.txクリップパネル.vcScaleRatio = new Vector3( fClipScale, fClipScale, 1f );
+                                this.txクリップパネル.tDraw2D( CDTXMania.app.Device, this.n本体X, this.n本体Y );
+                                this.txクリップパネル.vcScaleRatio = new Vector3( 1f, 1f, 1f );
+                            }
                             this.smallvc = new Vector3( this.ratio2, this.ratio2, 1f );
                             this.tx描画用.vcScaleRatio = this.smallvc;
                             {
                                 if( this.n総移動時間ms != -1 && this.rAVI != null )
                                 {
                                     if( this.fClipアスペクト比 < 1.77f )
-                                        this.tx描画用.tDraw2DUpsideDown( CDTXMania.app.Device, this.position2, 30 + this.n本体Y );
+                                        this.tx描画用.tDraw2DUpsideDown( CDTXMania.app.Device, this.position2, nClipInsetY + this.n本体Y );
                                     else
-                                        this.tx描画用.tDraw2DUpsideDown( CDTXMania.app.Device, 5 + this.n本体X, this.position2 );
+                                        this.tx描画用.tDraw2DUpsideDown( CDTXMania.app.Device, nClipInsetX + this.n本体X, this.position2 );
                                 }
                             }
                             #endregion
