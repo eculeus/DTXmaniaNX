@@ -272,10 +272,8 @@ namespace DTXMania
                             {
                                 if (chip.rAVI != null)
                                 {
-                                    if (chip.rAVI.avi != null) {
-                                        chip.rAVI.avi.Seek(n移動開始時刻ms - chip.nPlaybackTimeMs);
-                                    }
-                                    this.Start(chip.nChannelNumber, chip.rAVI, 1280, 720, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, chip.nPlaybackTimeMs);
+                                    if (bSeekOrStop(chip.rAVI, n移動開始時刻ms - chip.nPlaybackTimeMs))
+                                        this.Start(chip.nChannelNumber, chip.rAVI, 1280, 720, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, chip.nPlaybackTimeMs);
                                 }
                                 continue;
                             }
@@ -283,9 +281,9 @@ namespace DTXMania
                             {
                                 if (chip.rAVIPan != null)
                                 {
-                                    if (chip.rAVI != null && chip.rAVI.avi != null)
+                                    if (chip.rAVI != null && !bSeekOrStop(chip.rAVI, n移動開始時刻ms - chip.nPlaybackTimeMs))
                                     {
-                                        chip.rAVI.avi.Seek(n移動開始時刻ms - chip.nPlaybackTimeMs);
+                                        continue;
                                     }
                                     this.Start(chip.nChannelNumber, chip.rAVI, chip.rAVIPan.sz開始サイズ.Width, chip.rAVIPan.sz開始サイズ.Height, chip.rAVIPan.sz終了サイズ.Width, chip.rAVIPan.sz終了サイズ.Height, chip.rAVIPan.pt動画側開始位置.X, chip.rAVIPan.pt動画側開始位置.Y, chip.rAVIPan.pt動画側終了位置.X, chip.rAVIPan.pt動画側終了位置.Y, chip.rAVIPan.pt表示側開始位置.X, chip.rAVIPan.pt表示側開始位置.Y, chip.rAVIPan.pt表示側終了位置.X, chip.rAVIPan.pt表示側終了位置.Y, chip.n総移動時間, chip.nPlaybackTimeMs);
                                 }
@@ -296,6 +294,36 @@ namespace DTXMania
             }
             
         }
+        /// <summary>
+        /// Put a clip at the position the skip landed on. A skip past the end of the movie has
+        /// nothing left to show, so the clip is stopped instead of seeked: DirectShow rejects a
+        /// position beyond the media length with E_INVALIDARG.
+        /// Returns false when the clip is finished and should not be started.
+        /// </summary>
+        private bool bSeekOrStop(CDTX.CAVI rAVIClip, int nOffsetMs)
+        {
+            if (rAVIClip == null || rAVIClip.avi == null)
+            {
+                return true;        // no movie attached; the caller still wants its Start()
+            }
+            int nDuration = rAVIClip.avi.GetDuration();
+            if (nOffsetMs < 0 || (nDuration > 0 && nOffsetMs >= nDuration))
+            {
+                Trace.TraceInformation("CActPerfAVI: skip landed {0} ms into a {1} ms clip; stopping it.", nOffsetMs, nDuration);
+                if (rAVIClip.avi.b再生中)
+                {
+                    rAVIClip.avi.Stop();
+                }
+                if (this.rAVI == rAVIClip)
+                {
+                    this.n移動開始時刻ms = -1;
+                }
+                return false;
+            }
+            rAVIClip.avi.Seek(nOffsetMs);
+            return true;
+        }
+
         public void Stop()
         {
             Trace.TraceInformation("CActPerfAVI: Stop()");

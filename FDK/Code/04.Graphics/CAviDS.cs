@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Runtime.InteropServices;
 using DirectShowLib;
 using SharpDX;
@@ -93,38 +93,83 @@ namespace FDK
 			bPause = false;
 		}
 
+		/// <summary>
+		/// Seek the graph. The requested time is clamped into the media, because asking a filter
+		/// graph for a position past the end (or before the start) makes it return E_INVALIDARG,
+		/// which used to be thrown and took the whole game down when the Skip key ran off the end
+		/// of the movie. Note the 100 ns conversion has to be done in long arithmetic: int would
+		/// overflow at 3 min 34 s, which is well inside a normal song.
+		/// </summary>
 		public void Seek(int timeInMs)
 		{
-			DsError.ThrowExceptionForHR(seeker.SetPositions(new DsLong(timeInMs * 10000), AMSeekingSeekingFlags.AbsolutePositioning, null, AMSeekingSeekingFlags.NoPositioning));
-			DsError.ThrowExceptionForHR(control.GetState(1000, out state));
+			long nTarget = (long)timeInMs * 10000L;
+			if (nMediaLength > 0 && nTarget > nMediaLength - 10000L)
+			{
+				nTarget = nMediaLength - 10000L;    // the last whole millisecond of the media
+			}
+			if (nTarget < 0)
+			{
+				nTarget = 0;
+			}
+			int hr = seeker.SetPositions(new DsLong(nTarget), AMSeekingSeekingFlags.AbsolutePositioning, null, AMSeekingSeekingFlags.NoPositioning);
+			if (hr < 0)
+			{
+				System.Diagnostics.Trace.TraceWarning("CAviDS: Seek({0} ms -> {1}) failed (hr=0x{2:X8}); leaving the movie where it was.", timeInMs, nTarget, hr);
+				return;
+			}
+			tWaitForState("Seek");
+		}
+
+		/// <summary>GetState() after a state change, logging rather than throwing if the graph complains.</summary>
+		private void tWaitForState(string strWhat)
+		{
+			int hr = control.GetState(timeOutMs, out state);
+			if (hr < 0)
+			{
+				System.Diagnostics.Trace.TraceWarning("CAviDS: GetState() after {0} failed (hr=0x{1:X8}).", strWhat, hr);
+			}
 		}
 
 		public void Run()
 		{
-			DsError.ThrowExceptionForHR(control.Run());
-			DsError.ThrowExceptionForHR(control.GetState(1000, out state));
+			int hr = control.Run();
+			if (hr < 0)
+			{
+				System.Diagnostics.Trace.TraceWarning("CAviDS: Run() failed (hr=0x{0:X8}).", hr);
+				return;
+			}
+			tWaitForState("Run");
 			bPlaying = true;
 			bPause = false;
 		}
 
 		public void Stop()
 		{
-			DsError.ThrowExceptionForHR(control.Stop());
-			DsError.ThrowExceptionForHR(control.GetState(1000, out state));
+			int hr = control.Stop();
+			if (hr < 0)
+			{
+				System.Diagnostics.Trace.TraceWarning("CAviDS: Stop() failed (hr=0x{0:X8}).", hr);
+			}
+			tWaitForState("Stop");
 			bPlaying = false;
 			bPause = false;
 		}
 
 		public void Pause()
 		{
-			DsError.ThrowExceptionForHR(control.Pause());
-			DsError.ThrowExceptionForHR(control.GetState(1000, out state));
+			int hr = control.Pause();
+			if (hr < 0)
+			{
+				System.Diagnostics.Trace.TraceWarning("CAviDS: Pause() failed (hr=0x{0:X8}).", hr);
+				return;
+			}
+			tWaitForState("Pause");
 			bPause = true;
 		}
 
 		public void ToggleRun()
 		{
-			DsError.ThrowExceptionForHR(control.GetState(1000, out state));
+			tWaitForState("ToggleRun");
 			if (state == FilterState.Paused)
 			{
 				Run();
