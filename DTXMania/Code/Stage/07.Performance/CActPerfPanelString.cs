@@ -159,6 +159,16 @@ namespace DTXMania
                 }
                  */
 
+                // Decided per frame, not at activation: the actor outlives a trip through Config,
+                // so turning NotationView off has to put the stock position straight back.
+                if (CDTXMania.ConfigIni.bDrumsEnabled)
+                {
+                    bool bNotation = CDTXMania.ConfigIni.bDrumsNotationView;
+                    // notation view: under the (smaller) picture-in-picture movie, bottom right
+                    this.n曲名X = bNotation ? CActPerfDrumsNotation.TITLE_X : 950;
+                    this.n曲名Y = bNotation ? CActPerfDrumsNotation.TITLE_Y : 630;
+                }
+
                 SharpDX.Matrix mat = SharpDX.Matrix.Identity;
 
                 //
@@ -194,10 +204,15 @@ namespace DTXMania
                     mat *= SharpDX.Matrix.RotationZ(0.3f);
                 }
 
-                if (this.txジャケットパネル != null)
+                // The tilted jacket card sits in the bottom right, exactly where the notation view puts
+                // the picture-in-picture movie, so drop the card there and keep the movie readable.
+                bool bHideJacket = CDTXMania.ConfigIni.bDrumsEnabled && CDTXMania.ConfigIni.bDrumsNotationView
+                                   && CActPerfDrumsNotation.MOVIE_HIDE_JACKET;
+
+                if (this.txジャケットパネル != null && !bHideJacket)
                     this.txジャケットパネル.tDraw2D(CDTXMania.app.Device, this.nジャケットX, this.nジャケットY);
 
-                if (this.txジャケット画像 != null)
+                if (this.txジャケット画像 != null && !bHideJacket)
                     this.txジャケット画像.tDraw3D(CDTXMania.app.Device, mat);
 
                 if (this.txSongName.szImageSize.Width > 320)

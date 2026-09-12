@@ -720,6 +720,27 @@ namespace DTXMania
                 "The scroll way is reversed. Drums chips flow from the bottom to the top.");
             this.listItems.Add(this.iDrumsReverse);
 
+            this.iDrumsNotationView = new CItemList("NotationView", CItemBase.EPanelType.Normal, CDTXMania.ConfigIni.nDrumsNotationView,
+                "ドラム譜面を楽譜（五線）で\n" +
+                "表示します。\n" +
+                "  Off  : 通常のレーン表示\n" +
+                "  Scroll: 横スクロール\n" +
+                "  Page : 2段の譜面をめくる",
+                "Show the drum chart as staff notation.\n" +
+                "\n" +
+                " Off   : the usual vertical lanes.\n" +
+                " Scroll: the staff scrolls past a fixed playhead.\n" +
+                " Page  : two fixed staves, a playhead sweeps across and the page turns.",
+                new string[] { "Off", "Scroll", "Page" });
+            this.listItems.Add(this.iDrumsNotationView);
+
+            this.iDrumsNotationStems = new CItemToggle("NotationStems", CDTXMania.ConfigIni.bDrumsNotationStems,
+                "ONにすると\n" +
+                "楽譜表示に符幹と連桁を\n" +
+                "描画します。",
+                "Draw note stems and beams on the notation staff. OFF shows the noteheads only, which is easier to read at a glance.");
+            this.listItems.Add(this.iDrumsNotationStems);
+
             this.iDrumsPosition = new CItemList("JudgePosition", CItemBase.EPanelType.Normal, (int)CDTXMania.ConfigIni.JudgementStringPosition.Drums,
                 "ゲーム中に表示される\n"+
                 "判定文字の位置を変更します。\n" +
@@ -1732,6 +1753,10 @@ namespace DTXMania
             {
                 CDTXMania.stageConfig.tNotifyPadSelection(EKeyConfigPart.SYSTEM, EKeyConfigPad.SkipBackward);
             }
+            else if (this.listItems[this.nCurrentSelection] == this.iKeyAssignSystemSkip)
+            {
+                CDTXMania.stageConfig.tNotifyPadSelection(EKeyConfigPart.SYSTEM, EKeyConfigPad.Skip);
+            }
             else if (this.listItems[this.nCurrentSelection] == this.iKeyAssignSystemIncreasePlaySpeed)
             {
                 CDTXMania.stageConfig.tNotifyPadSelection(EKeyConfigPart.SYSTEM, EKeyConfigPad.IncreasePlaySpeed);
@@ -2099,6 +2124,11 @@ namespace DTXMania
                 "",
                 "Skip backward assign:\n To assign key/pads for Skip backward (rewind).");
             this.listItems.Add(this.iKeyAssignSystemSkipBackward);
+
+            this.iKeyAssignSystemSkip = new CItemBase("Skip in play",
+                "",
+                "Skip in play assign:\n To assign key/pads for skipping forward while playing.\n Every chip in the skipped part is counted as a MISS, so the score stays valid.");
+            this.listItems.Add(this.iKeyAssignSystemSkip);
 
             this.iKeyAssignSystemIncreasePlaySpeed = new CItemBase("Increase play speed",
                 "",
@@ -2938,6 +2968,7 @@ namespace DTXMania
         private CItemBase iKeyAssignSystemLoopDelete;
         private CItemBase iKeyAssignSystemSkipForward;
         private CItemBase iKeyAssignSystemSkipBackward;
+        private CItemBase iKeyAssignSystemSkip;
         private CItemBase iKeyAssignSystemIncreasePlaySpeed;
         private CItemBase iKeyAssignSystemDecreasePlaySpeed;
         private CItemBase iKeyAssignSystemRestart;
@@ -3161,6 +3192,8 @@ namespace DTXMania
         private CItemList iDrumsPosition;
         private CItemBase iDrumsReturnToMenu;
         private CItemToggle iDrumsReverse;
+        private CItemList iDrumsNotationView;
+        private CItemToggle iDrumsNotationStems;
         private CItemInteger iDrumsScrollSpeed;
         private CItemToggle iDrumsSnare;
         private CItemToggle iDrumsTight;
@@ -3415,6 +3448,8 @@ namespace DTXMania
             this.iDrumsLeftBassDrum.bON = CDTXMania.ConfigIni.bAutoPlay.LBD;
             this.iDrumsScrollSpeed.nCurrentValue = CDTXMania.ConfigIni.nScrollSpeed.Drums;
             this.iDrumsReverse.bON = CDTXMania.ConfigIni.bReverse.Drums;
+            this.iDrumsNotationView.n現在選択されている項目番号 = CDTXMania.ConfigIni.nDrumsNotationView;
+            this.iDrumsNotationStems.bON = CDTXMania.ConfigIni.bDrumsNotationStems;
             this.iDrumsPosition.n現在選択されている項目番号 = (int)CDTXMania.ConfigIni.JudgementStringPosition.Drums;
             this.iDrumsTight.bON = CDTXMania.ConfigIni.bTight;
             this.iDrumsInputAdjustTimeMs.nCurrentValue = CDTXMania.ConfigIni.nInputAdjustTimeMs.Drums;
@@ -3620,6 +3655,8 @@ namespace DTXMania
             CDTXMania.ConfigIni.bAutoPlay.LBD = this.iDrumsLeftBassDrum.bON;
             CDTXMania.ConfigIni.nScrollSpeed.Drums = this.iDrumsScrollSpeed.nCurrentValue;
             CDTXMania.ConfigIni.bReverse.Drums = this.iDrumsReverse.bON;
+            CDTXMania.ConfigIni.nDrumsNotationView = this.iDrumsNotationView.n現在選択されている項目番号;
+            CDTXMania.ConfigIni.bDrumsNotationStems = this.iDrumsNotationStems.bON;
             CDTXMania.ConfigIni.JudgementStringPosition.Drums = (EType)this.iDrumsPosition.n現在選択されている項目番号;
             CDTXMania.ConfigIni.bTight = this.iDrumsTight.bON;
             CDTXMania.ConfigIni.nInputAdjustTimeMs.Drums = this.iDrumsInputAdjustTimeMs.nCurrentValue;		// #23580 2011.1.3 yyagi

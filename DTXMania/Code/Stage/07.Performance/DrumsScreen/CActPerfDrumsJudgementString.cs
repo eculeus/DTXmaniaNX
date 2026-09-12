@@ -1275,12 +1275,38 @@ namespace DTXMania
                                 }
                             }
 
+                            if (CDTXMania.ConfigIni.bDrumsNotationView && j < 10)
+                            {
+                                // notation view: in the region already played, just left of the
+                                // playhead, at the staff height of the lane being judged
+                                int nJudgeCentre = CActPerfDrumsNotation.nJudgeX - CActPerfDrumsNotation.JUDGE_GAP - 64;
+                                if (nJudgeCentre < 66) nJudgeCentre = 66;
+                                num5 = nJudgeCentre - (this.stレーンサイズ[j].w / 2);
+                                num6 = CActPerfDrumsNotation.nLaneY(j) - CActPerfDrumsNotation.JUDGE_RISE - 22;
+                            }
                             int nRectX = CDTXMania.ConfigIni.nJudgeWidgh;
                             int nRectY = CDTXMania.ConfigIni.nJudgeHeight;
 
                             int xc = (num5 + base.st状態[j].n相対X座標) + (this.stレーンサイズ[j].w / 2);
                             int x = (xc - ((int)((110f * base.st状態[j].fX方向拡大率)))) - ((nRectX - 225) / 2);
                             int y = ((num6 + base.st状態[j].n相対Y座標) - ((int)(((140f * base.st状態[j].fY方向拡大率)) / 2.0))) - ((nRectY - 135) / 2);
+
+                            // Notation view: the big animated popup is JudgeWidgh x JudgeHeight (250x170
+                            // by default), far taller than the clear part of the band, so scale it down and
+                            // hang it from its bottom edge just above the staff, centred on the playhead.
+                            bool bNotationJudge = CDTXMania.ConfigIni.bDrumsNotationView && j < 10;
+                            if (bNotationJudge)
+                            {
+                                x = CActPerfDrumsNotation.nJudgeX - CActPerfDrumsNotation.JUDGE_GAP
+                                    - (int)(nRectX * CActPerfDrumsNotation.JUDGE_SCALE);
+                                y = CActPerfDrumsNotation.nLaneY(j) - CActPerfDrumsNotation.JUDGE_RISE
+                                    - (int)(nRectY * CActPerfDrumsNotation.JUDGE_SCALE);
+                                if (x < 2) x = 2;       // the playhead is close to the legend: overlap it
+                                if (y < 2) y = 2;
+                                if (CDTXMania.stagePerfDrumsScreen.tx判定画像anime != null)
+                                    CDTXMania.stagePerfDrumsScreen.tx判定画像anime.vcScaleRatio =
+                                        new Vector3(CActPerfDrumsNotation.JUDGE_SCALE, CActPerfDrumsNotation.JUDGE_SCALE, 1f);
+                            }
 
                             //if (base.tx判定文字列[num4] != null)
                             {
@@ -1328,6 +1354,9 @@ namespace DTXMania
                                 }
 
 
+                                if (bNotationJudge && CDTXMania.stagePerfDrumsScreen.tx判定画像anime != null)
+                                    CDTXMania.stagePerfDrumsScreen.tx判定画像anime.vcScaleRatio = new Vector3(1f, 1f, 1f);
+
                                 if (base.nShowLagType == (int)EShowLagType.ON ||
                                      ((base.nShowLagType == (int)EShowLagType.GREAT_POOR) && (base.st状態[j].judge != EJudgement.Perfect)))
                                 {
@@ -1373,6 +1402,15 @@ namespace DTXMania
                                 }
                             }
 
+                            if (CDTXMania.ConfigIni.bDrumsNotationView && j < 10)
+                            {
+                                // notation view: in the region already played, just left of the
+                                // playhead, at the staff height of the lane being judged
+                                int nJudgeCentre = CActPerfDrumsNotation.nJudgeX - CActPerfDrumsNotation.JUDGE_GAP - 64;
+                                if (nJudgeCentre < 66) nJudgeCentre = 66;
+                                num5 = nJudgeCentre - (this.stレーンサイズ[j].w / 2);
+                                num6 = CActPerfDrumsNotation.nLaneY(j) - CActPerfDrumsNotation.JUDGE_RISE - 22;
+                            }
                             int nRectX = 85;
                             int nRectY = 35;
 

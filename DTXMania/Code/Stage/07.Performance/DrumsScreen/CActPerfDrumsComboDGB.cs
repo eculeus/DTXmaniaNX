@@ -71,7 +71,10 @@ namespace DTXMania
 
             if( CDTXMania.ConfigIni.bドラムコンボ文字の表示 )
             {
-                if (CDTXMania.ConfigIni.bGraph有効.Drums && CDTXMania.ConfigIni.bSmallGraph)
+                // notation view: the combo digits would sit inside the staff band at y=60, so drop them below it
+                if (CDTXMania.ConfigIni.bDrumsNotationView)
+                    base.tDrawCombo_Drums(nCombo値, nジャンプインデックス, CActPerfDrumsNotation.COMBO_X, CActPerfDrumsNotation.COMBO_Y);
+                else if (CDTXMania.ConfigIni.bGraph有効.Drums && CDTXMania.ConfigIni.bSmallGraph)
                     base.tDrawCombo_Drums(nCombo値, nジャンプインデックス, 1275, 60);
                 else
                     base.tDrawCombo_Drums(nCombo値, nジャンプインデックス, 1245, 60);

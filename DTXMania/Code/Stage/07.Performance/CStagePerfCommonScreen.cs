@@ -1,4 +1,4 @@
-using DiscordRPC;
+﻿using DiscordRPC;
 using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
@@ -383,6 +383,7 @@ namespace DTXMania
             this.LoopEndMs = -1;
             this.bIsTrainingMode = false;
             this.bPAUSE = false;
+            this.ctSkipDisplay = null;
 
             #region [ Sounds that should be registered in the mixer before starting playing (chip sounds that will be played immediately after the start of the performance) ]
             foreach (CChip pChip in listChip)
@@ -506,6 +507,7 @@ namespace DTXMania
                 CDTXMania.tReleaseTexture(ref this.tx判定画像anime_3);
                 CDTXMania.tReleaseTexture(ref this.txBonusEffect);
                 CDTXMania.tReleaseTexture(ref this.txPlaySpeed);
+                CDTXMania.tReleaseTexture(ref this.txSkip);
                 base.OnManagedReleaseResources();
             }
         }
@@ -859,6 +861,9 @@ namespace DTXMania
         protected CTexture txChip;  // txチップ
         protected CTexture txHitBar;  // txヒットバー
         protected CTexture txPlaySpeed;
+        protected CTexture txSkip;						// 演奏中スキップの "SKIP" 表示
+        protected CCounter ctSkipDisplay;
+        protected const int nSkipIndicatorDisplayTimeMs = 1000;
         public CTexture tx判定画像anime;     //2013.8.2 kairera0467 アニメーションの場合はあらかじめこっちで読み込む。
         public CTexture tx判定画像anime_2;   //2014.3.16 kairera0467 棒とかで必要になる。
         public CTexture tx判定画像anime_3;
@@ -1439,6 +1444,10 @@ namespace DTXMania
                         int nInputAdjustTime = bPChipIsAutoPlay ? 0 : this.nInputAdjustTimeMs.Drums;
                         eJudgeResult = (bCorrectLane) ? this.e指定時刻からChipのJUDGEを返す(nHitTime, pChip, nInputAdjustTime) : EJudgement.Miss;
                         this.actJudgeString.Start(this.nチャンネル0Atoレーン07[pChip.nChannelNumber - EChannel.HiHatClose], bPChipIsAutoPlay ? EJudgement.Auto : eJudgeResult, pChip.nLag);
+                        // the notation view lights the lane here, so auto-played chips flash too;
+                        // the vertical view's own hook only fires on a real pad hit
+                        if (bNotationView && eJudgeResult != EJudgement.Miss)
+                            this.tNotationLaneHit(pChip);
                     }
                     break;
 
@@ -2427,6 +2436,10 @@ namespace DTXMania
                     Trace.TraceInformation("SKIP BACKWARD CSoundManager.rcPerformanceTimer.nCurrentTime=" + CSoundManager.rcPerformanceTimer.nCurrentTime + ", CDTXMania.Timer.nCurrentTime=" + CDTXMania.Timer.nCurrentTime);
                     this.tJumpInSong(Math.Max(0, CSoundManager.rcPerformanceTimer.nCurrentTime - CDTXMania.ConfigIni.nSkipTimeMs));
                 }
+                else if (!this.bPAUSE && CDTXMania.Pad.bPressed(EKeyConfigPart.SYSTEM, EKeyConfigPad.Skip))
+                {   // 演奏中のスキップ。飛ばした区間のチップはMISS扱いにするので、bIsTrainingModeは立てない(スコアは有効なまま)。
+                    this.tSkipInPlay();
+                }
                 else if (CDTXMania.Pad.bPressed(EKeyConfigPart.SYSTEM, EKeyConfigPad.LoopCreate))
                 {
                     this.bIsTrainingMode = true;
@@ -2879,7 +2892,7 @@ namespace DTXMania
                 //pChip.nDistanceFromBar.Guitar = (int)((pChip.nPlaybackTimeMs - CSoundManager.rcPerformanceTimer.nCurrentTime) * ScrollSpeedGuitar);
                 //pChip.nDistanceFromBar.Bass = (int)((pChip.nPlaybackTimeMs - CSoundManager.rcPerformanceTimer.nCurrentTime) * ScrollSpeedBass);
                 pChip.ComputeDistanceFromBar(CSoundManager.rcPerformanceTimer.nCurrentTime, this.actScrollSpeed.db現在の譜面スクロール速度);
-                if (Math.Min(Math.Min(pChip.nDistanceFromBar.Drums, pChip.nDistanceFromBar.Guitar), pChip.nDistanceFromBar.Bass) > 600)
+                if (Math.Min(Math.Min(pChip.nDistanceFromBar.Drums, pChip.nDistanceFromBar.Guitar), pChip.nDistanceFromBar.Bass) > nChipLookaheadPx)
                 {
                     break;
                 }
@@ -3532,7 +3545,7 @@ namespace DTXMania
                 //pChip.nDistanceFromBar.Guitar = (int)((pChip.nPlaybackTimeMs - CSoundManager.rcPerformanceTimer.nCurrentTime) * ScrollSpeedGuitar);
                 //pChip.nDistanceFromBar.Bass = (int)((pChip.nPlaybackTimeMs - CSoundManager.rcPerformanceTimer.nCurrentTime) * ScrollSpeedBass);
                 pChip.ComputeDistanceFromBar(CSoundManager.rcPerformanceTimer.nCurrentTime, this.actScrollSpeed.db現在の譜面スクロール速度);
-                if (Math.Min(Math.Min(pChip.nDistanceFromBar.Drums, pChip.nDistanceFromBar.Guitar), pChip.nDistanceFromBar.Bass) > 600)
+                if (Math.Min(Math.Min(pChip.nDistanceFromBar.Drums, pChip.nDistanceFromBar.Guitar), pChip.nDistanceFromBar.Bass) > nChipLookaheadPx)
                 {
                     break;
                 }
@@ -3581,7 +3594,11 @@ namespace DTXMania
                                 CDTXMania.Skin.soundMetronome.tPlay(40);
                             }
                         }
-                        if ((ePlayMode == EInstrumentPart.DRUMS) && (configIni.nLaneDisp.Drums == 0 || configIni.nLaneDisp.Drums == 1) && pChip.bVisible && (this.txChip != null))
+                        if (bNotationView && ePlayMode == EInstrumentPart.DRUMS)
+                        {
+                            tDrawNotationBeatLine(pChip);
+                        }
+                        else if ((ePlayMode == EInstrumentPart.DRUMS) && (configIni.nLaneDisp.Drums == 0 || configIni.nLaneDisp.Drums == 1) && pChip.bVisible && (this.txChip != null))
                         {
                             int l_drumPanelWidth = 0x22f;
                             int l_xOffset = 0;
@@ -3649,7 +3666,7 @@ namespace DTXMania
                 //pChip.nDistanceFromBar.Guitar = (int)((pChip.nPlaybackTimeMs - CSoundManager.rcPerformanceTimer.nCurrentTime) * ScrollSpeedGuitar);
                 //pChip.nDistanceFromBar.Bass = (int)((pChip.nPlaybackTimeMs - CSoundManager.rcPerformanceTimer.nCurrentTime) * ScrollSpeedBass);
                 pChip.ComputeDistanceFromBar(CSoundManager.rcPerformanceTimer.nCurrentTime, this.actScrollSpeed.db現在の譜面スクロール速度);
-                if (Math.Min(Math.Min(pChip.nDistanceFromBar.Drums, pChip.nDistanceFromBar.Guitar), pChip.nDistanceFromBar.Bass) > 600)
+                if (Math.Min(Math.Min(pChip.nDistanceFromBar.Drums, pChip.nDistanceFromBar.Guitar), pChip.nDistanceFromBar.Bass) > nChipLookaheadPx)
                 {
                     break;
                 }
@@ -4619,6 +4636,16 @@ namespace DTXMania
             this.actFillin.OnUpdateAndDraw();
         }
         protected abstract void tUpdateAndDraw_Chip_BarLine(CConfigIni configIni, ref CDTX dTX, ref CChip pChip);
+        /// <summary>Drums screen returns true when the horizontal notation view is on.</summary>
+        protected virtual bool bNotationView { get { return false; } }
+
+        /// <summary>Light this chip's lane on the notation staff. Only the drums screen does anything.</summary>
+        protected virtual void tNotationLaneHit(CChip pChip) { }
+
+        /// <summary>How far ahead (in vertical-lane px) chips are fed to the drawing code. The
+        /// notation view spreads them over a much smaller horizontal scale, so it needs more.</summary>
+        protected int nChipLookaheadPx { get { return bNotationView ? CActPerfDrumsNotation.LOOKAHEAD_PX : 600; } }
+        protected virtual void tDrawNotationBeatLine(CChip pChip) { }
         protected abstract void tDraw_LoopLine(CConfigIni configIni, bool bIsEnd);
         //protected abstract void t進行描画_チップ_ベース( CConfigIni configIni, ref CDTX dTX, ref CChip pChip );
         protected virtual void tUpdateAndDraw_Chip_Bass_Wailing(CConfigIni configIni, ref CDTX dTX, ref CChip pChip)  // t進行描画_チップ_ベース_ウェイリング
@@ -5604,6 +5631,58 @@ namespace DTXMania
 
             tJumpInSong(nStartTime);
         }
+
+        /// <summary>
+        /// 演奏中のスキップ。nSkipTimeMsだけ前に飛び、飛ばした区間のチップは
+        /// 判定ラインを素通りしたときと同じように処理する(=MISS)ので、スコアは有効なまま。
+        /// </summary>
+        protected void tSkipInPlay()
+        {
+            long nOldPosition = CSoundManager.rcPerformanceTimer.nCurrentTime;
+            long nNewPosition = nOldPosition + CDTXMania.ConfigIni.nSkipTimeMs;
+
+            Trace.TraceInformation("SKIP IN PLAY CSoundManager.rcPerformanceTimer.nCurrentTime=" + nOldPosition + ", newPosition=" + nNewPosition);
+
+            // 先に判定処理を済ませてからシークする(tJumpInSong()がロングノートのキャッシュを掃除してくれるため)。
+            this.tProcessSkippedChips(nNewPosition);
+
+            this.tJumpInSong(nNewPosition);
+
+            this.tStartSkipIndicator();
+        }
+
+        /// <summary>
+        /// スキップで飛ばす区間(現在位置～nNewPositionMs)の未ヒットチップを、
+        /// 判定ラインを通過したときと同じように処理する。
+        /// AUTOのレーンは本来通りに自動演奏扱い、それ以外はMISS扱いとする。
+        /// </summary>
+        protected void tProcessSkippedChips(long nNewPositionMs)
+        {
+            List<CChip> listChipAll = CDTXMania.DTX.listChip;
+            for (int i = Math.Max(0, this.nCurrentTopChip); i < listChipAll.Count; i++)
+            {
+                CChip pChip = listChipAll[i];
+                if (pChip.nPlaybackTimeMs >= nNewPositionMs)
+                {
+                    break;
+                }
+                if (pChip.bHit || (pChip.eInstrumentPart == EInstrumentPart.UNKNOWN))
+                {
+                    continue;
+                }
+
+                if (this.bCheckAutoPlay(pChip))
+                {
+                    // AUTOのレーンはスキップしなくても自動で叩かれていたので、そのまま自動演奏扱いにする(音は鳴らさない)。
+                    this.tProcessChipHit(pChip.nPlaybackTimeMs, pChip);
+                }
+                else
+                {
+                    pChip.nLag = 0;		// tProcessChipHit()の引数最後がfalseの時はpChip.nLagを計算しないため、ここで0を代入
+                    this.tProcessChipHit(pChip.nPlaybackTimeMs, pChip, false);
+                }
+            }
+        }
         protected void tJumpInSong(long newPosition)
         {
             long nNewPosition = Math.Max(0, newPosition);
@@ -5769,6 +5848,39 @@ namespace DTXMania
                 this.txPlaySpeed = CDTXMania.tGenerateTexture(bmpModifiedPlaySpeed, false);
                 bmpModifiedPlaySpeed.Dispose();
                 pfModifiedPlaySpeed.Dispose();
+            }
+        }
+
+        /// <summary>スキップ直後に1秒だけ "SKIP" と表示するためのカウンタを開始する。</summary>
+        private void tStartSkipIndicator()
+        {
+            if (this.txSkip == null)
+            {
+                CPrivateFastFont pfSkip = new CPrivateFastFont(new FontFamily(CDTXMania.ConfigIni.str選曲リストフォント), 24, FontStyle.Bold);
+                Bitmap bmpSkip = pfSkip.DrawPrivateFont("SKIP", CPrivateFont.DrawMode.Edge, Color.White, Color.White, Color.Black, Color.Red, true);
+                this.txSkip = CDTXMania.tGenerateTexture(bmpSkip, false);
+                bmpSkip.Dispose();
+                pfSkip.Dispose();
+            }
+            this.ctSkipDisplay = new CCounter(0, nSkipIndicatorDisplayTimeMs, 1, CDTXMania.Timer);
+        }
+
+        /// <summary>スキップ直後の "SKIP" 表示。</summary>
+        protected void tUpdateAndDraw_SkipIndicator(int x, int y)
+        {
+            if ((this.ctSkipDisplay == null) || this.ctSkipDisplay.b停止中)
+            {
+                return;
+            }
+            this.ctSkipDisplay.tUpdate();
+            if (this.ctSkipDisplay.bReachedEndValue)
+            {
+                this.ctSkipDisplay.tStop();
+                return;
+            }
+            if (this.txSkip != null)
+            {
+                this.txSkip.tDraw2D(CDTXMania.app.Device, x, y);
             }
         }
 
