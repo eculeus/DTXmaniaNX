@@ -1739,6 +1739,10 @@ namespace DTXMania
             {
                 CDTXMania.stageConfig.tNotifyPadSelection(EKeyConfigPart.SYSTEM, EKeyConfigPad.SkipBackward);
             }
+            else if (this.listItems[this.nCurrentSelection] == this.iKeyAssignSystemSkip)
+            {
+                CDTXMania.stageConfig.tNotifyPadSelection(EKeyConfigPart.SYSTEM, EKeyConfigPad.Skip);
+            }
             else if (this.listItems[this.nCurrentSelection] == this.iKeyAssignSystemIncreasePlaySpeed)
             {
                 CDTXMania.stageConfig.tNotifyPadSelection(EKeyConfigPart.SYSTEM, EKeyConfigPad.IncreasePlaySpeed);
@@ -2106,6 +2110,11 @@ namespace DTXMania
                 "",
                 "Skip backward assign:\n To assign key/pads for Skip backward (rewind).");
             this.listItems.Add(this.iKeyAssignSystemSkipBackward);
+
+            this.iKeyAssignSystemSkip = new CItemBase("Skip in play",
+                "",
+                "Skip in play assign:\n To assign key/pads for skipping forward while playing.\n Every chip in the skipped part is counted as a MISS, so the score stays valid.");
+            this.listItems.Add(this.iKeyAssignSystemSkip);
 
             this.iKeyAssignSystemIncreasePlaySpeed = new CItemBase("Increase play speed",
                 "",
@@ -2945,6 +2954,7 @@ namespace DTXMania
         private CItemBase iKeyAssignSystemLoopDelete;
         private CItemBase iKeyAssignSystemSkipForward;
         private CItemBase iKeyAssignSystemSkipBackward;
+        private CItemBase iKeyAssignSystemSkip;
         private CItemBase iKeyAssignSystemIncreasePlaySpeed;
         private CItemBase iKeyAssignSystemDecreasePlaySpeed;
         private CItemBase iKeyAssignSystemRestart;

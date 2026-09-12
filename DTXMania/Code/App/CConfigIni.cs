@@ -331,6 +331,17 @@ namespace DTXMania
 						this.padSkipBackward = value;
 					}
 				}
+				public CConfigIni.CKeyAssign.STKEYASSIGN[] Skip
+				{
+					get
+					{
+						return this.padSkip;
+					}
+					set
+					{
+						this.padSkip = value;
+					}
+				}
 				public CConfigIni.CKeyAssign.STKEYASSIGN[] IncreasePlaySpeed
 				{
 					get
@@ -427,6 +438,9 @@ namespace DTXMania
 							case (int)EKeyConfigPad.SkipBackward:
 								return this.padSkipBackward;
 
+							case (int)EKeyConfigPad.Skip:
+								return this.padSkip;
+
 							case (int)EKeyConfigPad.IncreasePlaySpeed:
 								return this.padIncreasePlaySpeed;
 
@@ -518,6 +532,10 @@ namespace DTXMania
 								this.padSkipBackward = value;
 								return;
 
+							case (int)EKeyConfigPad.Skip:
+								this.padSkip = value;
+								return;
+
 							case (int)EKeyConfigPad.IncreasePlaySpeed:
 								this.padIncreasePlaySpeed = value;
 								return;
@@ -555,6 +573,7 @@ namespace DTXMania
 				private CConfigIni.CKeyAssign.STKEYASSIGN[] padLoopDelete;
 				private CConfigIni.CKeyAssign.STKEYASSIGN[] padSkipForward;
 				private CConfigIni.CKeyAssign.STKEYASSIGN[] padSkipBackward;
+				private CConfigIni.CKeyAssign.STKEYASSIGN[] padSkip;
 				private CConfigIni.CKeyAssign.STKEYASSIGN[] padIncreasePlaySpeed;
 				private CConfigIni.CKeyAssign.STKEYASSIGN[] padDecreasePlaySpeed;
 				private CConfigIni.CKeyAssign.STKEYASSIGN[] padRestart;
@@ -2527,6 +2546,9 @@ namespace DTXMania
 			sw.Write("SkipBackward=");
 			this.tWriteKey(sw, this.KeyAssign.System.SkipBackward);
 			sw.WriteLine();
+			sw.Write("Skip=");
+			this.tWriteKey(sw, this.KeyAssign.System.Skip);
+			sw.WriteLine();
 			sw.Write("IncreasePlaySpeed=");
 			this.tWriteKey(sw, this.KeyAssign.System.IncreasePlaySpeed);
 			sw.WriteLine();
@@ -3968,6 +3990,10 @@ namespace DTXMania
 										{
 											this.tReadAndSetSkey(str4, this.KeyAssign.System.SkipBackward);
 										}
+										else if (str3.Equals("Skip"))
+										{
+											this.tReadAndSetSkey(str4, this.KeyAssign.System.Skip);
+										}
 										else if (str3.Equals("IncreasePlaySpeed"))
 										{
 											this.tReadAndSetSkey(str4, this.KeyAssign.System.IncreasePlaySpeed);
@@ -4251,6 +4277,7 @@ LoopCreate=
 LoopDelete=
 SkipForward=
 SkipBackward=
+Skip=
 IncreasePlaySpeed=
 DecreasePlaySpeed=
 Restart=K052

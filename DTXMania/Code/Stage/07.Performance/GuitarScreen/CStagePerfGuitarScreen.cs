@@ -209,7 +209,8 @@ namespace DTXMania
 				this.tUpdateAndDraw_PerformanceInformation();
 				//this.tUpdateAndDraw_WailingFrame();
 				this.tUpdateAndDraw_PlaySpeed();
-				
+				this.tUpdateAndDraw_SkipIndicator(600, 655);
+
 				this.tUpdateAndDraw_ChipFireGB();
 				this.tUpdateAndDraw_GuitarBonus();
 				this.tUpdateAndDraw_STAGEFAILED();
