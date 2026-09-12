@@ -333,7 +333,9 @@ namespace DTXMania
             }
             for (int i = 0; i < stLaneLabels.Length; i++)
             {
-                if (stLaneLabels[i].strText.Length == 0 || !bLaneIsUsed(i)) continue;
+                // every row is labelled whether or not this chart uses it: a missing RIDE or FLOOR
+                // caption reads as a bug, and the legend is a key to the staff, not to the song
+                if (stLaneLabels[i].strText.Length == 0) continue;
                 try
                 {
                     using (Bitmap bmp = this.pfLabel.DrawPrivateFont(stLaneLabels[i].strText, colLane(stLaneLabels[i].nColour), Color.Black))
@@ -345,19 +347,6 @@ namespace DTXMania
                 {
                     this.txLaneLabel[i] = null;
                 }
-            }
-        }
-
-        /// <summary>Does this chart ever use the lane? (The always-present ones just answer true.)</summary>
-        private static bool bLaneIsUsed(int nLane)
-        {
-            switch ((ELane)nLane)
-            {
-                case ELane.LC: return CDTXMania.DTX.bチップがある.LeftCymbal;
-                case ELane.LP: return CDTXMania.DTX.bチップがある.LP || CDTXMania.DTX.bチップがある.LBD;
-                case ELane.RD: return CDTXMania.DTX.bチップがある.Ride;
-                case ELane.FT: return CDTXMania.DTX.bチップがある.FT;
-                default: return true;
             }
         }
 
