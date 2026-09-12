@@ -440,6 +440,52 @@ namespace DTXMania
         }
         #endregion
 
+        #region [ Unattended screen capture (CI smoke test) ]
+        // Opt-in only: with DTXMANIA_AUTOCAPTURE_MS unset (the normal case) tAutoCapture() returns
+        // on the first line and nothing about the game changes. Set it to a millisecond interval
+        // and every frame whose turn it is gets written to Capture_img\auto_NNNN.png, exactly like
+        // pressing the Capture key would. Used by the CI smoke job, which has no desktop to
+        // screenshot that is guaranteed to show D3D content.
+        private static int nAutoCaptureIntervalMs = -1;     // -1 = env var not read yet, 0 = disabled
+        private static readonly Stopwatch swAutoCapture = new Stopwatch();
+        private static int nAutoCaptureIndex = 0;
+
+        private void tAutoCapture()
+        {
+            if (nAutoCaptureIntervalMs == 0)
+                return;
+
+            if (nAutoCaptureIntervalMs < 0)
+            {
+                int ms;
+                string str = Environment.GetEnvironmentVariable("DTXMANIA_AUTOCAPTURE_MS");
+                nAutoCaptureIntervalMs = (!string.IsNullOrEmpty(str) && int.TryParse(str, out ms) && ms > 0) ? ms : 0;
+                if (nAutoCaptureIntervalMs == 0)
+                    return;
+                Trace.TraceInformation("DTXMANIA_AUTOCAPTURE_MS={0}: capturing the screen to Capture_img every {0} ms.", nAutoCaptureIntervalMs);
+                swAutoCapture.Start();
+            }
+            else if (swAutoCapture.ElapsedMilliseconds < nAutoCaptureIntervalMs)
+            {
+                return;
+            }
+
+            swAutoCapture.Restart();
+            string strFullPath = Path.Combine(
+                Path.Combine(CDTXMania.strEXEのあるフォルダ, "Capture_img"),
+                string.Format("auto_{0:D4}.png", nAutoCaptureIndex++));
+            try
+            {
+                SaveResultScreen(strFullPath);
+            }
+            catch (Exception e)
+            {
+                Trace.TraceError("Auto capture failed: {0}", e.Message);
+                nAutoCaptureIntervalMs = 0;     // one failure is enough; don't spam the log
+            }
+        }
+        #endregion
+
         // Game 実装
         protected override void Initialize()
         {
@@ -1730,6 +1776,7 @@ for (int i = 0; i < 3; i++) {
             }
             this.Device.EndScene();			// Present()は game.csのOnFrameEnd()に登録された、GraphicsDeviceManager.game_FrameEnd() 内で実行されるので不要
             // (つまり、Present()は、Draw()完了後に実行される)
+            this.tAutoCapture();			// no-op unless DTXMANIA_AUTOCAPTURE_MS is set (CI smoke test)
 #if !GPUFlushAfterPresent
             actFlushGPU.OnUpdateAndDraw();		// Flush GPU	// EndScene()～Present()間 (つまりVSync前) でFlush実行
 #endif
@@ -2545,7 +2592,12 @@ for (int i = 0; i < 3; i++) {
                     //FDK.CSound管理.bIsMP3DecodeByWindowsCodec = CDTXMania.ConfigIni.bNoMP3Streaming;
 
 
-                    string strDefaultSoundDeviceBusType = CSoundManager.strDefaultDeviceBusType;
+                    // CSoundManager falls all the way through to ESoundDeviceType.Unknown when no
+                    // output device can be opened (a CI runner with no sound card, say), and then
+                    // leaves SoundDevice null; asking it for its bus type would throw here and take
+                    // the whole startup down after the fallback had already handled the problem.
+                    string strDefaultSoundDeviceBusType = (CSoundManager.SoundDevice == null)
+                        ? "(no sound device)" : CSoundManager.strDefaultDeviceBusType;
                     Trace.TraceInformation($"Bus type of the default sound device = {strDefaultSoundDeviceBusType}");
 
                     Trace.TraceInformation("サウンドデバイスの初期化を完了しました。");

@@ -356,6 +356,22 @@ namespace FDK
 			//	Trace.TraceError(string.Format("サウンドデバイスの初期化に失敗しました。"));
 			//	throw new Exception("サウンドデバイスの初期化に失敗しました。");
 			//}
+
+			#region [ Last resort: run silently, if the caller asked for that ]
+			// Nothing opened, so SoundDevice is still null and the next thing to touch it - the
+			// master volume setter, the performance screen's clock - throws. On a machine that
+			// simply has no audio endpoint (a CI runner) that turns into a crash rather than a
+			// silent run, so let an opt-in environment variable substitute a device that plays
+			// nothing. SoundDeviceType stays Unknown, so tGenerateSound() still refuses to create
+			// sounds and every chip ends up with no WAV, which callers already cope with.
+			if (SoundDevice == null &&
+				!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("FDK_ALLOW_SILENT_SOUND_DEVICE")))
+			{
+				SoundDevice = new CSoundDeviceNull();
+				rcPerformanceTimer = new CSoundTimer(SoundDevice);
+			}
+			#endregion
+
 			if (soundDeviceType == ESoundDeviceType.ExclusiveWASAPI || soundDeviceType == ESoundDeviceType.ASIO || soundDeviceType == ESoundDeviceType.SharedWASAPI)
 			{
 				#region [ CPU論理コア数の取得 (HT含む) ]

@@ -54,3 +54,245 @@ jobs:
         with:
           files: dist/*.zip
           generate_release_notes: true
+
+  # Launches the freshly built game on the runner, in compact mode with everything on auto-play
+  # and the drums notation view on, and photographs it. Purely diagnostic: it runs after `build`
+  # (so it cannot delay or break the release step) and `continue-on-error` keeps a broken smoke
+  # test from failing the workflow.
+  smoke:
+    name: Smoke test (auto-play screenshots)
+    needs: build
+    runs-on: windows-latest
+    continue-on-error: true
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download the built runtime
+        uses: actions/download-artifact@v4
+        with:
+          pattern: DTXManiaNX-*
+          merge-multiple: true
+          path: dist
+
+      - name: Unpack the runtime
+        shell: pwsh
+        run: |
+          $zip = (Get-ChildItem dist\*.zip | Select-Object -First 1).FullName
+          Write-Host "Unpacking $zip"
+          Expand-Archive -Path $zip -DestinationPath game -Force
+          Get-ChildItem game | Select-Object Name, Length | Format-Table | Out-String | Write-Host
+
+      - name: Probe the runner (display, audio, DirectX)
+        shell: powershell
+        continue-on-error: true
+        run: |
+          Add-Type -AssemblyName System.Windows.Forms
+          Write-Host "=== Session ==="
+          Write-Host ("SessionId       : {0}" -f (Get-Process -Id $PID).SessionId)
+          Write-Host ("UserInteractive : {0}" -f [Environment]::UserInteractive)
+          Write-Host "=== Display ==="
+          Write-Host ("VirtualScreen   : {0}" -f [System.Windows.Forms.SystemInformation]::VirtualScreen)
+          [System.Windows.Forms.Screen]::AllScreens | ForEach-Object { Write-Host ("Screen          : {0} {1}" -f $_.DeviceName, $_.Bounds) }
+          Get-CimInstance Win32_VideoController | Select-Object Name, DriverVersion, VideoModeDescription | Format-List | Out-String | Write-Host
+          Write-Host "=== Audio ==="
+          # This image has both services running but no endpoint at all, which is why the game is
+          # launched with FDK_ALLOW_SILENT_SOUND_DEVICE. If a device ever shows up here, drop it.
+          Get-Service audiosrv, AudioEndpointBuilder | Select-Object Name, Status, StartType | Format-Table | Out-String | Write-Host
+          Get-CimInstance Win32_SoundDevice | Select-Object Name, Status | Format-Table | Out-String | Write-Host
+          Get-PnpDevice -Class 'MEDIA', 'AudioEndpoint' -ErrorAction SilentlyContinue |
+            Select-Object Status, Class, FriendlyName | Format-Table | Out-String | Write-Host
+          Write-Host "=== DirectX DLLs in System32/SysWOW64 ==="
+          foreach ($n in 'd3d9.dll', 'd3d9on12.dll', 'd3dx9_43.dll', 'd3d12.dll', 'd3d12core.dll', 'd3dref9.dll') {
+            foreach ($d in "$env:WINDIR\System32", "$env:WINDIR\SysWOW64") {
+              Write-Host ("{0,-16} {1,-24} {2}" -f $n, (Split-Path $d -Leaf), (Test-Path (Join-Path $d $n)))
+            }
+          }
+
+      - name: Install the D3DX9 runtime (d3dx9_43.dll, x86)
+        shell: pwsh
+        run: |
+          # DTXMania LoadLibrary()s d3dx9_43.dll at startup and refuses to boot without it; stock
+          # Windows Server has the core DirectX but not the June 2010 D3DX redist.
+          $tmp = $env:RUNNER_TEMP
+          $exe = Join-Path $tmp 'dxredist.exe'
+          $url = 'https://download.microsoft.com/download/8/4/A/84A35BF1-DAFE-4AE8-82AF-AD2AE20B6B14/directx_Jun2010_redist.exe'
+          Invoke-WebRequest -Uri $url -OutFile $exe -UseBasicParsing
+          $out = Join-Path $tmp 'dxcab'
+          New-Item -ItemType Directory -Force -Path $out | Out-Null
+          Start-Process -FilePath $exe -ArgumentList "/Q", "/T:`"$out`"", "/C" -Wait -NoNewWindow
+          $cab = Get-ChildItem $out -Filter '*d3dx9_43_x86.cab' | Select-Object -First 1
+          if (-not $cab) { Get-ChildItem $out | Select-Object Name | Out-String | Write-Host; throw 'd3dx9_43 x86 cab not found in the redist' }
+          & expand.exe $cab.FullName -F:d3dx9_43.dll (Join-Path $PWD 'game') | Write-Host
+          Get-ChildItem game\d3dx9_43.dll | Format-List Name, Length | Out-String | Write-Host
+
+      - name: Build the smoke-test song
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path song | Out-Null
+          Copy-Item Tests\SmokeSong\smoke.dtx song\ -Force
+          function New-SilentWav([string]$path, [double]$seconds) {
+            $rate = 44100; $channels = 2; $bits = 16
+            $block = $channels * $bits / 8
+            $byteRate = $rate * $block
+            $dataLen = [int]([math]::Floor($byteRate * $seconds / $block) * $block)
+            $fs = [System.IO.File]::Create($path)
+            $bw = New-Object System.IO.BinaryWriter($fs)
+            $bw.Write([System.Text.Encoding]::ASCII.GetBytes('RIFF'))
+            $bw.Write([uint32](36 + $dataLen))
+            $bw.Write([System.Text.Encoding]::ASCII.GetBytes('WAVEfmt '))
+            $bw.Write([uint32]16)                 # fmt chunk size
+            $bw.Write([uint16]1)                  # PCM
+            $bw.Write([uint16]$channels)
+            $bw.Write([uint32]$rate)
+            $bw.Write([uint32]$byteRate)
+            $bw.Write([uint16]$block)
+            $bw.Write([uint16]$bits)
+            $bw.Write([System.Text.Encoding]::ASCII.GetBytes('data'))
+            $bw.Write([uint32]$dataLen)
+            $bw.Write((New-Object byte[] $dataLen))   # silence
+            $bw.Close(); $fs.Close()
+          }
+          New-SilentWav (Join-Path $PWD 'song\bgm.wav') 70
+          New-SilentWav (Join-Path $PWD 'song\tick.wav') 0.05
+          Get-ChildItem song | Select-Object Name, Length | Format-Table | Out-String | Write-Host
+
+      - name: Write the smoke-test Config.ini
+        shell: pwsh
+        run: |
+          # Plain ASCII with no BOM: CConfigIni reads Shift_JIS unless a BOM says otherwise.
+          # Only the keys that matter here; everything else keeps its built-in default.
+          $cfg = @(
+            '; Written by the CI smoke job. Not the stock Runtime\Config.ini.',
+            '[System]',
+            'DTXPath=',
+            'FullScreen=0',          # windowed, so the desktop capture can see it
+            'WindowWidth=1024',      # the runner's desktop is only 1024x768; the back buffer
+            'WindowHeight=576',      # stays 1280x720 either way, so Capture_img is full size
+            'WindowX=0',
+            'WindowY=0',
+            'VSyncWait=0',
+            'SoundDeviceType=0',     # 0 = ACM/DirectSound; FDK falls back on its own if it fails
+            'Drums=1',
+            'Guitar=0',
+            'MovieMode=0',
+            'AVI=0',
+            'BGA=0',
+            'TimeStretch=0',
+            'PlaySpeed=20',          # 20 = 1.0x
+            'BGMSound=1',
+            'MasterVolume=0',
+            '[Log]',
+            'OutputLog=1',
+            'TraceDTXDetails=1',
+            'TraceSongSearch=1',
+            '[PlayOption]',
+            'DrumsReverse=0',
+            'DrumsNotationView=1',
+            '[AutoPlay]',
+            'LC=1', 'HH=1', 'SD=1', 'BD=1', 'HT=1', 'LT=1',
+            'FT=1', 'CY=1', 'RD=1', 'LP=1', 'LBD=1'
+          )
+          [System.IO.File]::WriteAllLines((Join-Path $PWD 'game\Config.ini'), $cfg, (New-Object System.Text.ASCIIEncoding))
+          Get-Content game\Config.ini | Out-String | Write-Host
+
+      - name: Launch the game and take screenshots
+        shell: powershell
+        timeout-minutes: 5
+        run: |
+          $ErrorActionPreference = 'Continue'
+          Add-Type -AssemblyName System.Drawing
+          Add-Type -AssemblyName System.Windows.Forms
+          Add-Type -TypeDefinition (@(
+            'using System;',
+            'using System.Runtime.InteropServices;',
+            'public class Win32 {',
+            '  [StructLayout(LayoutKind.Sequential)] public struct RECT { public int L, T, R, B; }',
+            '  [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h, out RECT r);',
+            '  [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr h);',
+            '  [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);',
+            '}'
+          ) -join [Environment]::NewLine)
+          $game = Join-Path $PWD 'game'
+          $exe  = Join-Path $game 'DTXManiaNX.exe'
+          $dtx  = Join-Path $PWD 'song\smoke.dtx'
+          $shots = Join-Path $PWD 'screenshots'
+          New-Item -ItemType Directory -Force -Path $shots | Out-Null
+
+          # Opt-in in-game capture: the game writes its own back buffer to Capture_img every 2 s.
+          # Independent of whether the runner's desktop is capturable at all - and the back buffer
+          # is always 1280x720, so these are full-size even though the window is not.
+          $env:DTXMANIA_AUTOCAPTURE_MS = '2000'
+          # This runner has no audio endpoint at all: DirectSound fails with DSERR_NODRIVER
+          # (0x88780078) and so does everything else, which used to leave FDK with a null device
+          # and crash startup. Opt in to running silently instead.
+          $env:FDK_ALLOW_SILENT_SOUND_DEVICE = '1'
+
+          Write-Host "Launching: $exe `"$dtx`""
+          $proc = Start-Process -FilePath $exe -ArgumentList "`"$dtx`"" -WorkingDirectory $game -PassThru
+          $bounds = [System.Windows.Forms.SystemInformation]::VirtualScreen
+          Write-Host "Desktop is $($bounds.Width)x$($bounds.Height)"
+
+          for ($i = 1; $i -le 24; $i++) {
+            Start-Sleep -Seconds 2
+            $proc.Refresh()
+            if ($proc.HasExited) {
+              Write-Host "!! DTXManiaNX exited after $($i * 2)s with code $($proc.ExitCode)"
+              break
+            }
+            $h = $proc.MainWindowHandle
+            $desc = "no window yet"
+            if ($h -ne [IntPtr]::Zero) {
+              $r = New-Object Win32+RECT
+              [void][Win32]::GetWindowRect($h, [ref]$r)
+              $desc = "'$($proc.MainWindowTitle)' rect=($($r.L),$($r.T))-($($r.R),$($r.B)) visible=$([Win32]::IsWindowVisible($h))"
+              [void][Win32]::SetForegroundWindow($h)
+            }
+            Write-Host ("t={0,3}s  {1}" -f ($i * 2), $desc)
+            try {
+              $bmp = New-Object System.Drawing.Bitmap($bounds.Width, $bounds.Height)
+              $g = [System.Drawing.Graphics]::FromImage($bmp)
+              $g.CopyFromScreen($bounds.X, $bounds.Y, 0, 0, $bmp.Size)
+              $g.Dispose()
+              $bmp.Save((Join-Path $shots ("desktop_{0:D2}.png" -f $i)), [System.Drawing.Imaging.ImageFormat]::Png)
+              $bmp.Dispose()
+            } catch {
+              Write-Host "desktop capture failed: $_"
+            }
+          }
+
+          Write-Host "=== Windows on the desktop ==="
+          Get-Process | Where-Object { $_.MainWindowTitle } | Select-Object ProcessName, MainWindowTitle | Format-Table | Out-String | Write-Host
+
+          if (-not $proc.HasExited) { Stop-Process -Id $proc.Id -Force }
+          Start-Sleep -Seconds 2
+          Get-Process -Name DTXManiaNX -ErrorAction SilentlyContinue | Stop-Process -Force
+          Write-Host "=== Capture_img ==="
+          $frames = @(Get-ChildItem (Join-Path $game 'Capture_img') -ErrorAction SilentlyContinue)
+          $frames | Select-Object Name, Length | Format-Table | Out-String | Write-Host
+          # A run that never rendered still "passes" every step above, so say so loudly here.
+          if ($frames.Count -lt 2) {
+            throw "the game rendered $($frames.Count) frame(s) - see DTXManiaLog.txt in the smoke-screenshots artifact"
+          }
+          Write-Host "$($frames.Count) frames captured from the game's own back buffer (1280x720)."
+
+      - name: Show DTXManiaLog.txt
+        if: always()
+        shell: pwsh
+        continue-on-error: true
+        run: |
+          $log = Join-Path $PWD 'game\DTXManiaLog.txt'
+          if (Test-Path $log) { Get-Content $log | Out-String | Write-Host } else { Write-Host 'no DTXManiaLog.txt' }
+
+      - name: Upload smoke test output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-screenshots
+          if-no-files-found: warn
+          path: |
+            screenshots/**
+            game/Capture_img/**
+            game/DTXManiaLog.txt
+            game/Config.ini
+            song/smoke.dtx
