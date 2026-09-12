@@ -180,6 +180,7 @@
     <Compile Include="Code\Item\CItemToggle.cs" />
     <Compile Include="Code\Score,Song\CBoxDef.cs" />
     <Compile Include="Code\Score,Song\CDTX.cs" />
+    <Compile Include="Code\Score,Song\CHighScores.cs" />
     <Compile Include="Code\Score,Song\CScoreIni.cs" />
     <Compile Include="Code\Score,Song\CSetDef.cs" />
     <Compile Include="Code\Stage\02.Title\CEnumSongs.cs" />

@@ -744,6 +744,7 @@ namespace DTXMania
 		public string str選曲リストフォント;
         public string[] strCardName; //2015.12.3 kaiera0467 DrumとGuitarとBassで名前を別々にするため、string[3]に変更。
         public string[] strGroupName;
+        public string strLastPlayerName;    // 名前つきハイスコア (scores.ini) で最後に使った名前。
 		public EDrumComboTextDisplayPosition ドラムコンボ文字の表示位置;
         public bool bドラムコンボ文字の表示;
         public STDGBVALUE<EType> JudgementStringPosition;  // 判定文字表示位置
@@ -1325,6 +1326,7 @@ namespace DTXMania
             this.strCardName = new string[ 3 ];
             this.strGroupName = new string[ 3 ];
             this.nNameColor = new int[ 3 ];
+            this.strLastPlayerName = "";
 
             #region[ 画像関連 ]
             this.nJudgeAnimeType = 1;
@@ -1596,6 +1598,11 @@ namespace DTXMania
             sw.WriteLine("GroupNameDrums={0}", this.strGroupName[ 0 ]);
             sw.WriteLine("GroupNameGuitar={0}", this.strGroupName[ 1 ]);
             sw.WriteLine("GroupNameBass={0}", this.strGroupName[ 2 ]);
+            sw.WriteLine();
+            sw.WriteLine("; 名前つきハイスコア表(scores.ini)で最後に入力した名前。");
+            sw.WriteLine("; リザルト画面の名前入力の初期値として使われます。");
+            sw.WriteLine("; Last name entered for the named high score table (scores.ini).");
+            sw.WriteLine("LastPlayerName={0}", this.strLastPlayerName);
             sw.WriteLine();
             sw.WriteLine("; ネームカラー");
             sw.WriteLine("; 0=白, 1=薄黄色, 2=黄色, 3=緑, 4=青, 5=紫 以下略。");
@@ -2740,6 +2747,10 @@ namespace DTXMania
                                             else if( str3.Equals( "GroupNameBass" ) )
                                             {
                                                 this.strGroupName[2] = str4;
+                                            }
+                                            else if( str3.Equals( "LastPlayerName" ) )
+                                            {
+                                                this.strLastPlayerName = CHighScores.strSanitizeName( str4 );
                                             }
                                             else if( str3.Equals( "NameColorDrums" ) )
                                             {
