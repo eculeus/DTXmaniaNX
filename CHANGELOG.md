@@ -9,6 +9,13 @@ Builds are produced by GitHub Actions (`.github/workflows/build.yml`, Release x8
 extracting the zip over an existing DTXManiaNX folder; `Config.ini` is not included, so key
 bindings and settings are kept.
 
+## 1.5.0-beta.10 — 2026-09-12
+
+- Page mode lays bars out by time, so the playhead moves at one constant speed for the whole song
+  and bars of different length or tempo get different widths (lines hold as many whole bars as
+  fit). Each line starts with a short pre-roll (`DrumsNotationPrerollMs`, default 600) so the
+  playhead is already on the new line before its first note.
+
 ## 1.5.0-beta.9 — 2026-09-12
 
 ### Drums notation view (new)
@@ -20,7 +27,7 @@ and scoring are unchanged (notes are placed from the same timing the lanes use).
   left into a fixed red playhead just after the lane labels. About two bars of 4/4 are visible
   ahead at SPEED 2.0; the in-game SPEED setting scales it.
 - **Page**: two static staves of `DrumsNotationBarsPerLine` bars each (Config.ini only, default
-  4). The playhead plays the top staff, then the bottom, then the top again; the staff that is
+  4, a target density). The playhead plays the top staff, then the bottom, then the top again; the staff that is
   not being played always shows the next line and is replaced with a short crossfade the moment
   the playhead leaves it, so nothing ever moves vertically. Played notes are dimmed.
 - Standard drum notation positions: hi-hat top space (x head, circled x when open), ride top
