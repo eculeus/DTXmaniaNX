@@ -146,24 +146,26 @@ namespace DTXMania
                     this.n難易度開始文字位置 = 0;
                 }
                 this.r直前の曲 = c曲リストノード;
-
-                this.tSelectedSongHighScoreHolderChanged();
             }
         }
 
         /// <summary>
-        /// ドラムの1位の名前を控えておく。scores.ini はハイスコアパネルが読んでいるので、そこから貰う。
+        /// <para>ドラムの1位の名前をハイスコアパネルから貰う。(scores.ini を読んでいるのはあちら)</para>
+        /// <para>難易度変更は変更通知を伴わないことがあるので、描画のたびに引き直す。
+        /// 文字列比較だけで、テクスチャの作り直しは名前が変わったときだけ。</para>
         /// </summary>
         private void tSelectedSongHighScoreHolderChanged()
         {
-            string strBestPlayerName旧 = this.strBestPlayerName;
-            this.strBestPlayerName = "";
+            string strBestPlayerName新 = "";
 
             if (CDTXMania.ConfigIni.bDrumsEnabled && (CDTXMania.stageSongSelection.actHighScorePanel != null))
-                this.strBestPlayerName = CDTXMania.stageSongSelection.actHighScorePanel.strTopEntryName ?? "";
+                strBestPlayerName新 = CDTXMania.stageSongSelection.actHighScorePanel.strTopEntryName ?? "";
 
-            if (strBestPlayerName旧 != this.strBestPlayerName)
+            if (strBestPlayerName新 != this.strBestPlayerName)
+            {
+                this.strBestPlayerName = strBestPlayerName新;
                 this.bBestPlayerNameの再生成が必要 = true;
+            }
         }
 
 
@@ -879,6 +881,8 @@ namespace DTXMania
         /// </summary>
         private void tDrawBestPlayerName(int x, int y)
         {
+            this.tSelectedSongHighScoreHolderChanged();
+
             if (this.bBestPlayerNameの再生成が必要)
             {
                 CDTXMania.tReleaseTexture(ref this.txBestPlayerName);

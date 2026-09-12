@@ -38,26 +38,51 @@ namespace DTXMania
 		// メソッド
 
 		/// <summary>
-		/// 選択曲または難易度が変わったときに、その譜面の scores.ini を読み直す。
+		/// 選択曲が変わったときの通知。(難易度変更は毎フレームの監視で拾うので、これは必須ではない)
 		/// </summary>
 		public void tSelectedSongChanged()
 		{
+			this.tReloadIfSelectionChanged( true );
+		}
+
+		/// <summary>
+		/// <para>(選択曲, 難易度スロット, 譜面) が前回と変わっていたら scores.ini を読み直す。</para>
+		/// <para>難易度は CActSelectSongList の「アンカ難易度」から算出される値で、HHx2 の難易度変更のほか、
+		/// その難易度を持たない曲へスクロールしただけでも変わる。通知漏れを気にせず済むように、
+		/// 変更通知ではなく毎フレームの比較で検出する。(比較は参照とintのみ。読み込みは変化時だけ)</para>
+		/// </summary>
+		private void tReloadIfSelectionChanged( bool bForce )
+		{
+			CStageSongSelection stage = CDTXMania.stageSongSelection;
+			CSongListNode c曲リストノード = ( stage != null ) ? stage.r現在選択中の曲 : null;
+			CScore cスコア = ( stage != null ) ? stage.rSelectedScore : null;
+			int n難易度 = ( stage != null ) ? stage.nSelectedSongDifficultyLevel : 0;
+
+			if( !bForce &&
+				object.ReferenceEquals( c曲リストノード, this.r直前の曲 ) &&
+				object.ReferenceEquals( cスコア, this.r直前のスコア ) &&
+				( n難易度 == this.n直前の難易度 ) )
+				return;
+
+			this.r直前の曲 = c曲リストノード;
+			this.r直前のスコア = cスコア;
+			this.n直前の難易度 = n難易度;
+
 			this.listEntries = new List<CHighScores.CEntry>();
 			this.strTopEntryName = "";
 			this.bScoreSelected = false;
 			this.strDifficultyLabel = "";
-
-			CSongListNode c曲リストノード = CDTXMania.stageSongSelection.r現在選択中の曲;
-			CScore cスコア = CDTXMania.stageSongSelection.rSelectedScore;
+			this.strDifficultyLevel = "";
 
 			if( ( c曲リストノード != null ) && ( cスコア != null ) &&
 				( ( c曲リストノード.eNodeType == CSongListNode.ENodeType.SCORE ) || ( c曲リストノード.eNodeType == CSongListNode.ENodeType.SCORE_MIDI ) ) )
 			{
 				this.bScoreSelected = true;
 
-				int n難易度 = CDTXMania.stageSongSelection.nSelectedSongDifficultyLevel;
 				if( ( n難易度 >= 0 ) && ( n難易度 < 5 ) && !string.IsNullOrEmpty( c曲リストノード.arDifficultyLabel[ n難易度 ] ) )
 					this.strDifficultyLabel = c曲リストノード.arDifficultyLabel[ n難易度 ];
+
+				this.strDifficultyLevel = strLevel表記( cスコア );
 
 				this.listEntries = CHighScores.tLoad(
 					CHighScores.strFilePath( cスコア.FileInformation.AbsoluteFilePath ) ).listEntries(
@@ -73,6 +98,20 @@ namespace DTXMania
 			this.b表の再生成が必要 = true;
 		}
 
+		/// <summary>
+		/// ステータスパネルのレベル表示と同じ書式で、ドラムのレベルを返す。
+		/// </summary>
+		private static string strLevel表記( CScore cスコア )
+		{
+			int nLevel = ( cスコア.SongInformation.Level.Drums * 10 ) + cスコア.SongInformation.LevelDec.Drums;
+			if( nLevel <= 0 )
+				return "";
+
+			return ( CDTXMania.ConfigIni.nSkillMode == 0 )
+				? string.Format( CultureInfo.InvariantCulture, "{0,2:00}", nLevel / 10 )
+				: string.Format( CultureInfo.InvariantCulture, "{0}.{1:00}", nLevel / 100, nLevel % 100 );
+		}
+
 
 		// CActivity 実装
 
@@ -81,15 +120,23 @@ namespace DTXMania
 			this.listEntries = new List<CHighScores.CEntry>();
 			this.strTopEntryName = "";
 			this.strDifficultyLabel = "";
+			this.strDifficultyLevel = "";
 			this.bScoreSelected = false;
 			this.b表の再生成が必要 = true;
+
+			// 演奏から戻ってきたときは同じ曲・同じ難易度のまま scores.ini だけが変わっているので、
+			// 次のフレームで必ず読み直させる。
+			this.r直前の曲 = null;
+			this.r直前のスコア = null;
+			this.n直前の難易度 = -1;
+
 			base.OnActivate();
 		}
 		public override void OnManagedCreateResources()
 		{
 			if( !base.bNotActivated )
 			{
-				this.prvf見出し = new CPrivateFastFont( new FontFamily( CDTXMania.ConfigIni.str選曲リストフォント ), 13, FontStyle.Regular );
+				this.prvf見出し = new CPrivateFastFont( new FontFamily( CDTXMania.ConfigIni.str選曲リストフォント ), 11, FontStyle.Regular );
 				this.prvf行 = new CPrivateFastFont( new FontFamily( CDTXMania.ConfigIni.str選曲リストフォント ), 10, FontStyle.Regular );
 				this.b表の再生成が必要 = true;
 				base.OnManagedCreateResources();
@@ -107,7 +154,12 @@ namespace DTXMania
 		}
 		public override int OnUpdateAndDraw()
 		{
-			if( base.bNotActivated || !this.bScoreSelected || !CDTXMania.ConfigIni.bDrumsEnabled )
+			if( base.bNotActivated )
+				return 0;
+
+			this.tReloadIfSelectionChanged( false );		// 難易度変更・曲移動をここで拾う。
+
+			if( !this.bScoreSelected || !CDTXMania.ConfigIni.bDrumsEnabled )
 				return 0;
 
 			if( this.b表の再生成が必要 )
@@ -127,20 +179,26 @@ namespace DTXMania
 
 		#region [ private ]
 		//-----------------
-		// インフォメーション(4,0)-(244,42) と スキルポイントパネル(32,180)-(219,242) の間の空き領域。
+		// 画面左端の空き領域。上は 5_header panel.png の帯(x 0-250 では y50 まで不透明)、
+		// 下はスキルポイントパネル(32,180)-(219,242)、右はプリイメージパネル(x250-)。
 		private const int n本体X = 4;
-		private const int n本体Y = 46;
+		private const int n本体Y = 52;
 		private const int n表の幅 = 242;
 		private const int n行の高さ = 19;
-		private const int n1行目のY = 26;
+		private const int n1行目のY = 25;
 		private const int nMaxRows = 5;
 		// 10pt での実測: 数字7桁=53px, "100.00%"=55px。各列がぶつからないように決めた値。
 		private const int nName最大幅 = 94;
 		private const int nScore右端 = 176;
+		private const int n見出し右側最大幅 = 124;
 
 		private bool b表の再生成が必要;
 		private bool bScoreSelected;
+		private int n直前の難易度 = -1;
 		private string strDifficultyLabel;
+		private string strDifficultyLevel;
+		private CSongListNode r直前の曲;
+		private CScore r直前のスコア;
 		private List<CHighScores.CEntry> listEntries;
 		private CPrivateFastFont prvf見出し;
 		private CPrivateFastFont prvf行;
@@ -154,7 +212,7 @@ namespace DTXMania
 				return;
 
 			int nRowCount = ( this.listEntries.Count > 0 ) ? this.listEntries.Count : 1;
-			int n表の高さ = n1行目のY + ( nRowCount * n行の高さ ) + 6;
+			int n表の高さ = n1行目のY + ( nRowCount * n行の高さ ) + 4;
 
 			using( Bitmap bitmap = new Bitmap( n表の幅, n表の高さ ) )
 			{
@@ -163,10 +221,15 @@ namespace DTXMania
 					graphics.FillRectangle( new SolidBrush( Color.FromArgb( 176, 0, 0, 0 ) ), 0, 0, bitmap.Width, bitmap.Height );
 					graphics.DrawRectangle( new Pen( Color.FromArgb( 255, 150, 150, 150 ), 1f ), 0, 0, bitmap.Width - 1, bitmap.Height - 1 );
 
-					string str見出し = ( this.strDifficultyLabel.Length > 0 )
-						? "DRUMS BEST - " + this.strDifficultyLabel
-						: "DRUMS BEST";
-					this.t左寄せで描画する( graphics, this.prvf見出し, str見出し, 6, 2, Color.Orange );
+					// 左に「何の表か」、右に「いま見ている難易度スロットのラベルとレベル」。
+					this.t左寄せで描画する( graphics, this.prvf見出し, "DRUMS BEST", 6, 1, Color.Orange );
+
+					string str難易度 = this.strDifficultyLabel;
+					if( this.strDifficultyLevel.Length > 0 )
+						str難易度 = ( str難易度.Length > 0 ) ? ( str難易度 + " " + this.strDifficultyLevel ) : ( "Lv " + this.strDifficultyLevel );
+
+					if( str難易度.Length > 0 )
+						this.t右寄せで描画する( graphics, this.prvf見出し, str難易度, n表の幅 - 6, 1, Color.Aqua, n見出し右側最大幅 );
 
 					if( this.listEntries.Count == 0 )
 					{
@@ -214,12 +277,22 @@ namespace DTXMania
 
 		private void t右寄せで描画する( Graphics graphics, CPrivateFastFont prvf, string str, int xRight, int y, Color color )
 		{
+			this.t右寄せで描画する( graphics, prvf, str, xRight, y, color, 0 );
+		}
+
+		/// <param name="n最大幅">0 以外なら、これを超える幅の文字列は横に縮めて収める。</param>
+		private void t右寄せで描画する( Graphics graphics, CPrivateFastFont prvf, string str, int xRight, int y, Color color, int n最大幅 )
+		{
 			if( string.IsNullOrEmpty( str ) )
 				return;
 
 			using( Bitmap bitmap = prvf.DrawPrivateFont( str, color, Color.Black ) )
 			{
-				graphics.DrawImage( bitmap, xRight - bitmap.Width, y, bitmap.Width, bitmap.Height );
+				int nWidth = bitmap.Width;
+				if( ( n最大幅 > 0 ) && ( nWidth > n最大幅 ) )
+					nWidth = n最大幅;
+
+				graphics.DrawImage( bitmap, xRight - nWidth, y, nWidth, bitmap.Height );
 			}
 		}
 		//-----------------
