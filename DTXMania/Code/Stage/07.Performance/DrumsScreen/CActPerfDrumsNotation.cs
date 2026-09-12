@@ -26,8 +26,8 @@ namespace DTXMania
         //  vertical-lane mode and is pushed to PANEL_Y here), so nothing      //
         //  overlaps the staff.  Tune these from a screenshot if needed.       //
         // ------------------------------------------------------------------ //
-        public const int PLAYHEAD_X = 340;                          // notes are hit when they reach this x
-                                                                    // (just over a quarter in, clear of the legend)
+        public const int PLAYHEAD_X = 300;                          // notes are hit when they reach this x
+                                                                    // (just past the legend gutter)
         public const int STAFF_SPACE = 36;                          // px between two staff lines
         public const int STAFF_STEP = STAFF_SPACE / 2;              // one staff position (line -> space) = 18
         public const int STAFF_BOTTOM_Y = 380;                      // y of the bottom line
@@ -52,42 +52,42 @@ namespace DTXMania
         // Where the rest of the drums HUD goes while the notation band owns the top 65% of the screen.
         // All of these are only used when ConfigIni.bDrumsNotationView is on.
         public const int PROGRESS_X = 0;                            // song progress bar, laid out horizontally
-        public const int PROGRESS_Y = BAND_BOTTOM_Y + 2;            // thin strip directly under the band
+        public const int PROGRESS_Y = BAND_BOTTOM_Y + 2;            // directly under the band
         public const int PROGRESS_W = 1280;
-        public const int PROGRESS_H = 6;
+        public const int PROGRESS_H = 18;                           // as thick as the stock vertical bar is wide
+        public const int PROGRESS_MARKER_W = 3;                     // opaque white tick at the current position
         public const int PANEL_X = 6;                               // status panel, scaled down, bottom left
-        public const int PANEL_Y = 482;
-        public const float PANEL_SCALE = 0.54f;                     // 257x439 -> 139x237, so it fits in 482..719
+        public const int PANEL_Y = 494;
+        public const float PANEL_SCALE = 0.51f;                     // 257x439 -> 131x224, so it fits in 494..718
         public const int SCORE_X = 160;                             // score, to the right of the panel
-        public const int SCORE_Y = 488;
+        public const int SCORE_Y = 500;
         public const int PLAYSPEED_X = 160;                         // "Play Speed" text
-        public const int PLAYSPEED_Y = 576;
+        public const int PLAYSPEED_Y = 588;
         public const int SKIP_X = 160;                              // SKIP toast
-        public const int SKIP_Y = 612;
+        public const int SKIP_Y = 624;
         public const int COMBO_X = 940;                             // combo digits (right edge); the "COMBO" caption
-        public const int COMBO_Y = 498;                             // is dropped here, there is no room for it
+        public const int COMBO_Y = 510;                             // is dropped here, there is no room for it
         public const int GAUGE_Y = 672;                             // Excite Gauge + SPEED badge, along the bottom
         public const int MOVIE_X = 956;                             // picture-in-picture movie (CActPerfAVI window
-        public const int MOVIE_Y = 478;                             // mode), bottom right
-        public const float MOVIE_SCALE = 0.77f;                     // its 416x234 box -> 320x180
+        public const int MOVIE_Y = 494;                             // mode), bottom right
+        public const float MOVIE_SCALE = 0.70f;                     // its 416x234 box -> 291x164
         public const int TITLE_X = 956;                             // song title / artist, under the movie
-        public const int TITLE_Y = 660;
+        public const int TITLE_Y = 662;
         public const bool MOVIE_HIDE_JACKET = true;                 // the tilted jacket card lives in the same
                                                                     // corner, so drop it rather than cover the movie
 
-        // The judgement popup is drawn in the band, centred on the playhead just above the staff.
-        // The big animated image (JudgeAnimeType<2 with JudgeFrames>1, the default) is
-        // JudgeWidgh x JudgeHeight = 250x170; at 0.8 it is 200x136 and fits in the 138 px of band
-        // above the second ledger line, so it never covers a notehead.
+        // The judgement popup is drawn at the playhead, at the staff height of the lane it judges, so
+        // it reads as belonging to that note. Small, and lifted clear of the head it belongs to.
         public const int JUDGE_X = PLAYHEAD_X;                      // judgement popup centre x
-        public const int JUDGE_Y = 100;                             // centre y of the small judgement sprite
-        public const int JUDGE_BOTTOM_Y = 138;                      // bottom edge of the large animated judgement
-        public const float JUDGE_SCALE = 0.8f;
+        public const int JUDGE_RISE = 26;                           // its bottom edge sits this far over the head
+        public const float JUDGE_SCALE = 0.5f;
 
         // Sizes derived from the staff spacing (36 px).
         private const int HEAD_W = 48;              // round notehead cell -> 38 x 29 px head (1.05 x 0.8 spaces)
-        private const int XHEAD_W = 40;             // x notehead cell     -> 36 px = one space, 4.5 px strokes
+        private const int XHEAD_W = 40;             // hi-hat x cell       -> 36 px = one space, 4.5 px strokes
         private const int CIRCLEX_W = 42;           // circled x (open hi-hat) -> 37 px ring, matching the x
+        private const int BOLDX_W = 50;             // crash x cell        -> 45 px = 1.25 spaces, 8 px strokes
+        private const int DIAMOND_W = 48;           // ride diamond cell   -> 37 px wide
         private const int STEM_W = 4;
         private const int STEM_BITE = 4;            // round heads: the stem is set this far inside the right edge
         private const int LEDGER_W = 54;
@@ -100,12 +100,13 @@ namespace DTXMania
                                                     // than pushing a lone spike above the beams
         private const int BEAM_H = 5;
         private const int BEAM_GAP = 10;
-        private const bool BEAMS = true;            // join notes of the same beat with a beam
+        /// <summary>Stems and beams are off by default: most players read the heads faster without them.</summary>
+        private static bool bStems { get { return CDTXMania.ConfigIni.bDrumsNotationStems; } }
 
         // Lane legend down the left edge of the band: one column, one label per lane. At 36 px
         // spacing the lanes are 18 px apart, so a ~17 px glyph fits without stacking.
-        private const int LABEL_X = 8;
-        private const int LABEL_GUTTER_W = 150;     // darker strip the legend sits on; the staff lines and the
+        private const int LABEL_RIGHT_PAD = 10;     // labels are right-aligned and end this far before the staff
+        private const int LABEL_GUTTER_W = 110;     // darker strip the legend sits on; the staff lines and the
                                                     // playhead region start after it so nothing strikes the text
         private const int LABEL_FONT_SIZE = 15;     // points -> about 14 px of capital, which still clears
                                                     // the 18 px between two lane positions
@@ -119,11 +120,12 @@ namespace DTXMania
         private const int POS_MIN = -1;             // lowest staff position any voice uses (left pedal)
         private const int POS_MAX = 12;             // highest (left crash on its second ledger line)
 
-        // Sprite sheet: 5 shape columns x 13 colour rows of 64x64 cells.
+        // Sprite sheet: 6 shape columns x 13 colour rows of 64x64 cells.
         private const int CELL = 64;
-        private const int SHAPE_SOLID = 0, SHAPE_HEAD = 1, SHAPE_X = 2, SHAPE_CIRCLE_X = 3, SHAPE_DIAMOND = 4;
-        private const int C_WHITE = 0, C_PURPLE = 1, C_YELLOW = 2, C_GREEN = 3, C_RED = 4, C_ORANGE = 5,
-                          C_BLUE = 6, C_DEEPBLUE = 7, C_CYAN = 8, C_MAGENTA = 9, C_PINK = 10,
+        private const int SHAPE_SOLID = 0, SHAPE_HEAD = 1, SHAPE_X = 2, SHAPE_CIRCLE_X = 3, SHAPE_DIAMOND = 4,
+                          SHAPE_BOLD_X = 5;
+        private const int C_WHITE = 0, C_PURPLE = 1, C_YELLOW = 2, C_LIME = 3, C_RED = 4, C_ORANGE = 5,
+                          C_BLUE = 6, C_DEEPBLUE = 7, C_TEAL = 8, C_MAGENTA = 9, C_PINK = 10,
                           C_DARK = 11, C_PLAYHEAD = 12;
 
         private CTexture tx;
@@ -141,18 +143,20 @@ namespace DTXMania
 
         // Standard drum-set notation on a percussion staff, coloured like the vertical lanes
         // (sampled from Graphics\7_chips_drums.png: BD/LBD purple, HH blue, SD yellow, HT green,
-        //  LT red, FT orange, CY blue, RD pale cyan, LC magenta, LP pink).
+        //  LT red, FT orange, LC magenta, LP pink). The cymbals were three near-identical blue x
+        //  heads, so the ride is now a teal diamond, the crash a bold white x on its ledger line,
+        //  and the hi tom moved to lime so it cannot be read as the ride.
         private static readonly Dictionary<EChannel, STNote> mapNotes = new Dictionary<EChannel, STNote>
         {
             { EChannel.HiHatClose,   new STNote( 9, SHAPE_X,        C_BLUE,     true ) },
             { EChannel.Snare,        new STNote( 5, SHAPE_HEAD,     C_YELLOW,   true ) },
             { EChannel.BassDrum,     new STNote( 1, SHAPE_HEAD,     C_PURPLE,   false) },
-            { EChannel.HighTom,      new STNote( 7, SHAPE_HEAD,     C_GREEN,    true ) },
+            { EChannel.HighTom,      new STNote( 7, SHAPE_HEAD,     C_LIME,     true ) },
             { EChannel.LowTom,       new STNote( 6, SHAPE_HEAD,     C_RED,      true ) },
-            { EChannel.Cymbal,       new STNote(10, SHAPE_X,        C_DEEPBLUE, true ) },
+            { EChannel.Cymbal,       new STNote(10, SHAPE_BOLD_X,   C_WHITE,    true ) },
             { EChannel.FloorTom,     new STNote( 3, SHAPE_HEAD,     C_ORANGE,   true ) },
             { EChannel.HiHatOpen,    new STNote( 9, SHAPE_CIRCLE_X, C_BLUE,     true ) },
-            { EChannel.RideCymbal,   new STNote( 8, SHAPE_X,        C_CYAN,     true ) },
+            { EChannel.RideCymbal,   new STNote( 8, SHAPE_DIAMOND,  C_TEAL,     true ) },
             { EChannel.LeftCymbal,   new STNote(12, SHAPE_X,        C_MAGENTA,  true ) },
             { EChannel.LeftPedal,    new STNote(-1, SHAPE_X,        C_PINK,     false) },
             { EChannel.LeftBassDrum, new STNote( 1, SHAPE_HEAD,     C_PURPLE,   false) },
@@ -174,12 +178,12 @@ namespace DTXMania
             new STLaneLabel( 9, C_BLUE,     "HI-HAT" ),     // 1  HH (and open hi-hat)
             new STLaneLabel( 5, C_YELLOW,   "SNARE"  ),     // 2  SD
             new STLaneLabel( 1, C_PURPLE,   "KICK"   ),     // 3  BD
-            new STLaneLabel( 7, C_GREEN,    "HI TOM" ),     // 4  HT
+            new STLaneLabel( 7, C_LIME,     "HI TOM" ),     // 4  HT
             new STLaneLabel( 6, C_RED,      "LO TOM" ),     // 5  LT
             new STLaneLabel( 3, C_ORANGE,   "FLOOR"  ),     // 6  FT
-            new STLaneLabel(10, C_DEEPBLUE, "CRASH"  ),     // 7  CY
+            new STLaneLabel(10, C_WHITE,    "CRASH"  ),     // 7  CY
             new STLaneLabel(-1, C_PINK,     "L.PEDAL"),     // 8  LP (and left bass drum)
-            new STLaneLabel( 8, C_CYAN,     "RIDE"   ),     // 9  RD
+            new STLaneLabel( 8, C_TEAL,     "RIDE"   ),     // 9  RD
         };
 
         /// <summary>A chip the stage has handed us this frame, ready to be laid out.</summary>
@@ -284,12 +288,12 @@ namespace DTXMania
             {
                 case C_PURPLE:   return Color.FromArgb(173, 125, 255);
                 case C_YELLOW:   return Color.FromArgb(255, 226,  77);
-                case C_GREEN:    return Color.FromArgb( 92, 224, 116);
+                case C_LIME:     return Color.FromArgb(150, 230,  60);
                 case C_RED:      return Color.FromArgb(255,  72,  72);
                 case C_ORANGE:   return Color.FromArgb(255, 153,  41);
                 case C_BLUE:     return Color.FromArgb( 77, 179, 255);
                 case C_DEEPBLUE: return Color.FromArgb( 77, 134, 255);
-                case C_CYAN:     return Color.FromArgb(168, 223, 255);
+                case C_TEAL:     return Color.FromArgb(  0, 190, 160);
                 case C_MAGENTA:  return Color.FromArgb(255,  61, 140);
                 case C_PINK:     return Color.FromArgb(255, 134, 200);
                 default:         return Color.White;
@@ -299,6 +303,13 @@ namespace DTXMania
         public override int OnUpdateAndDraw()
         {
             return 0;   // drawing is driven by the stage so it interleaves with the chip loop
+        }
+
+        /// <summary>Staff y of a lane (ELane 0..9), i.e. the height its noteheads are drawn at.</summary>
+        public static int nLaneY(int nLane)
+        {
+            if (nLane < 0 || nLane >= stLaneLabels.Length) return STAFF_BOTTOM_Y - 5 * STAFF_STEP;
+            return STAFF_BOTTOM_Y - stLaneLabels[nLane].nPos * STAFF_STEP;
         }
 
         /// <summary>Screen x for a chip given its (vertical-lane) distance from the judgement line.</summary>
@@ -380,7 +391,9 @@ namespace DTXMania
                 if (txLabel == null) continue;
                 int y = STAFF_BOTTOM_Y - stLaneLabels[i].nPos * STAFF_STEP;
                 txLabel.nTransparency = 255;
-                txLabel.tDraw2D(CDTXMania.app.Device, LABEL_X, y - txLabel.szImageSize.Height / 2);
+                int nLabelX = LABEL_GUTTER_W - LABEL_RIGHT_PAD - txLabel.szImageSize.Width;
+                if (nLabelX < 2) nLabelX = 2;
+                txLabel.tDraw2D(CDTXMania.app.Device, nLabelX, y - txLabel.szImageSize.Height / 2);
             }
         }
 
@@ -460,26 +473,26 @@ namespace DTXMania
                 // One stem up for the hands, one stem down for the feet. A round head is met at its
                 // right edge at the head's own height; an x head has no ink out there, so its stem
                 // starts at the tip of the upper-right arm (+arm, -arm) and visibly continues it.
-                bool bUpEndIsX = (nUpEndShape == SHAPE_X);
-                int nUpArm = bUpEndIsX ? nHeadHalfWidth(SHAPE_X) : nUpHalf;
+                bool bUpEndIsX = (nUpEndShape == SHAPE_X || nUpEndShape == SHAPE_BOLD_X);
+                int nUpArm = bUpEndIsX ? nHeadHalfWidth(nUpEndShape) : nUpHalf;
                 int nStemX = x + nUpArm - (bUpEndIsX ? STEM_W / 2 : STEM_BITE);
-                if (nUpBottom != int.MinValue)
+                if (bStems && nUpBottom != int.MinValue)
                 {
                     int nStemBottom = bUpEndIsX ? nUpBottom - nUpArm + STEM_W : nUpBottom;
                     int nStemTop = Math.Min(STEM_TOP_Y, nStemBottom - MIN_STEM_LEN);
                     tDrawCell(SHAPE_SOLID, C_WHITE, nStemX, nStemTop, STEM_W, nStemBottom - nStemTop, nUpAlpha);
                 }
-                if (nDownTop != int.MaxValue)
+                if (bStems && nDownTop != int.MaxValue)
                 {
-                    bool bDownEndIsX = (nDownEndShape == SHAPE_X);
-                    int nDownArm = bDownEndIsX ? nHeadHalfWidth(SHAPE_X) : nDownHalf;
+                    bool bDownEndIsX = (nDownEndShape == SHAPE_X || nDownEndShape == SHAPE_BOLD_X);
+                    int nDownArm = bDownEndIsX ? nHeadHalfWidth(nDownEndShape) : nDownHalf;
                     int nDownStemX = x - nDownArm + (bDownEndIsX ? STEM_W / 2 : STEM_BITE) - STEM_W;
                     int nDownStemTop = bDownEndIsX ? nDownTop + nDownArm - STEM_W : nDownTop;
                     tDrawCell(SHAPE_SOLID, C_WHITE, nDownStemX, nDownStemTop, STEM_W, STEM_BOTTOM_Y - nDownStemTop, nDownAlpha);
                 }
 
                 #region [ beams: join the up-stems of one beat (384 ticks per bar, 96 per beat) ]
-                if (BEAMS && nUpBottom != int.MinValue)
+                if (bStems && nUpBottom != int.MinValue)
                 {
                     int nBeat = nPlaybackPosition / 96;
                     if (nBeat == nBeamBeat && nBeamStartX >= 0)
@@ -520,6 +533,8 @@ namespace DTXMania
         {
             if (nShape == SHAPE_X) return XHEAD_W;
             if (nShape == SHAPE_CIRCLE_X) return CIRCLEX_W;
+            if (nShape == SHAPE_BOLD_X) return BOLDX_W;
+            if (nShape == SHAPE_DIAMOND) return DIAMOND_W;
             return HEAD_W;
         }
 
@@ -534,9 +549,11 @@ namespace DTXMania
             int nCell = nHeadCell(nShape);
             switch (nShape)
             {
-                case SHAPE_X:        return nCell * 252 / 640;   // 40 -> 15  (arm tip, x and y)
+                case SHAPE_X:
+                case SHAPE_BOLD_X:   return nCell * 252 / 640;   // 40 -> 15, 50 -> 19  (arm tip, x and y)
                 case SHAPE_CIRCLE_X: return nCell * 282 / 640;   // 42 -> 18  (ring)
-                default:             return nCell * 252 / 640;   // 48 -> 18  (ellipse / diamond)
+                case SHAPE_DIAMOND:  return nCell * 244 / 640;   // 48 -> 18  (right vertex)
+                default:             return nCell * 252 / 640;   // 48 -> 18  (ellipse)
             }
         }
 

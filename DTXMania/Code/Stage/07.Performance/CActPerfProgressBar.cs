@@ -201,9 +201,11 @@ namespace DTXMania
 			{
 				using (Graphics graphics = Graphics.FromImage(bitmap))
 				{
-					for (int i = 0; i < nHorizontalH; i += 5)
+					// dark trough with a thin frame, so the bar reads as a bar and not as a smear
+					graphics.FillRectangle(new SolidBrush(Color.FromArgb(255, 12, 12, 18)), 0, 0, nHorizontalW, nHorizontalH);
+					using (Pen pen = new Pen(Color.FromArgb(150, 150, 160)))
 					{
-						graphics.FillRectangle(new SolidBrush((i / 5 % 2 == 0) ? Color.FromArgb(255, 10, 10, 10) : Color.FromArgb(255, 14, 14, 14)), 0, i, nHorizontalW, 5);
+						graphics.DrawRectangle(pen, 0, 0, nHorizontalW - 1, nHorizontalH - 1);
 					}
 				}
 				txH背景 = CDTXMania.tGenerateTexture(bitmap);
@@ -212,10 +214,12 @@ namespace DTXMania
 			{
 				using (Graphics graphics2 = Graphics.FromImage(bitmap2))
 				{
-					graphics2.FillRectangle(new SolidBrush(Color.FromArgb(48, Color.White)), 0, 0, nHorizontalW, nHorizontalH);
-					// the bright edge sits at the right of the texture so that, drawn right-aligned,
+					graphics2.FillRectangle(new SolidBrush(Color.FromArgb(70, Color.White)), 0, 0, nHorizontalW, nHorizontalH);
+					// the marker sits at the right of the texture so that, drawn right-aligned,
 					// it always lands on the current playback position
-					graphics2.FillRectangle(new SolidBrush(Color.FromArgb(160, Color.White)), nHorizontalW - 5, 0, 5, nHorizontalH);
+					graphics2.FillRectangle(new SolidBrush(Color.White),
+						nHorizontalW - CActPerfDrumsNotation.PROGRESS_MARKER_W, 0,
+						CActPerfDrumsNotation.PROGRESS_MARKER_W, nHorizontalH);
 				}
 				txH進捗 = CDTXMania.tGenerateTexture(bitmap2);
 			}
@@ -241,12 +245,12 @@ namespace DTXMania
 				CProgressSection c区間 = listProgressSection[(int)ePart][i];
 				int x = nHorizontalX + i * nHorizontalW / nSectionIntervalCount;
 				int x2 = nHorizontalX + (i + 1) * nHorizontalW / nSectionIntervalCount;
-				Rectangle rectangle = new Rectangle(0, 0, x2 - x, nHorizontalH);
+				Rectangle rectangle = new Rectangle(0, 0, x2 - x, nHorizontalH - 4);
 				if (!CDTXMania.ConfigIni.bIsAutoPlay(ePart))
 				{
 					if ((i + 1) * nLastChipTime / nSectionIntervalCount - 1 > ((CTimerBase)CDTXMania.Timer).n現在時刻ms)
 					{
-						tx灰.tDraw2D(CDTXMania.app.Device, x, nHorizontalY, rectangle);
+						tx灰.tDraw2D(CDTXMania.app.Device, x, nHorizontalY + 2, rectangle);
 					}
 					else
 					{
@@ -255,18 +259,18 @@ namespace DTXMania
 						{
 							if (c区間.nHitCount == c区間.nChipCount)
 							{
-								tx黄.tDraw2D(CDTXMania.app.Device, x, nHorizontalY, rectangle);
+								tx黄.tDraw2D(CDTXMania.app.Device, x, nHorizontalY + 2, rectangle);
 							}
 							else
 							{
-								tx青.tDraw2D(CDTXMania.app.Device, x, nHorizontalY, rectangle);
+								tx青.tDraw2D(CDTXMania.app.Device, x, nHorizontalY + 2, rectangle);
 							}
 						}
 					}
 				}
 				else if (c区間.nChipCount > 0)
 				{
-					tx灰.tDraw2D(CDTXMania.app.Device, x, nHorizontalY, rectangle);
+					tx灰.tDraw2D(CDTXMania.app.Device, x, nHorizontalY + 2, rectangle);
 				}
 			}
 
