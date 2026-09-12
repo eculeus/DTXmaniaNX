@@ -93,7 +93,8 @@ namespace DTXMania
         public const int PAGE_BAR_NUMBER_DY = -179;
         public const int PAGE_HIT_ALPHA = 102;                      // 40%: played notes stay readable on the page
         public const int PAGE_RIGHT_MARGIN = 10;
-        public const int PAGE_NOTE_INSET = 14;                      // gap between a bar line and its downbeat
+        public const int PAGE_PREROLL_MS = 600;                     // run-in before a line's first bar line, so
+                                                                    // the playhead arrives before the first note
         public const int PAGE_SWAP_FADE_MS = 300;                   // a staff crossfades to its next line over
                                                                     // this long when the playhead leaves it
 
@@ -196,9 +197,13 @@ namespace DTXMania
 
         private static bool bPage { get { return CDTXMania.ConfigIni.bDrumsNotationPage; } }
 
-        private int[] nBarTimeMs;                   // page view tempo map: bar-line times ...
-        private int[] nBarPos;                      // ... and their playback positions
-        private int nBarSearchHint;
+        private int[] nBarMs;                       // page view: bar start times ...
+        private int[] nBarNumber;                   // ... and the bar number printed at each one
+        private int[] nLineMs;                      // the time each staff line starts at ...
+        private int[] nLineFirstBar;                // ... and its first bar's index in nBarMs
+        private double dbPxPerMs;                   // one scale for the whole song, so the playhead is linear
+        private int nPrerollMs, nPrerollPx, nSongEndMs;
+        private int nBarSearchHint, nLineSearchHint;
 
         // Which line each staff is showing, the one it is fading out of, and when that started.
         private readonly int[] nSystemLine = new int[] { -1, -1 };
@@ -284,7 +289,7 @@ namespace DTXMania
             if (!base.bNotActivated)
             {
                 this.tx = CDTXMania.tGenerateTexture(CSkin.Path(@"Graphics\7_notation.png"));
-                this.nBarTimeMs = null;         // rebuilt for this song on the first page-mode frame
+                this.nLineMs = null;            // rebuilt for this song on the first page-mode frame
                 tCreateLaneLabels();
                 base.OnManagedCreateResources();
             }
@@ -412,76 +417,112 @@ namespace DTXMania
             tDrawCell(SHAPE_SOLID, C_PLAYHEAD, PLAYHEAD_X - 2, BAND_TOP_Y + 8, 4, BAND_BOTTOM_Y - BAND_TOP_Y - 16, 255);
         }
 
-        #region [ page view: two fixed staves, a playhead sweeping across the upper one ]
+        #region [ page view: two fixed staves, the playhead sweeping them in turn ]
 
         /// <summary>
-        /// Where the song is now, in playback-position units (384 per bar). Interpolated between
-        /// the bar-line chips, which carry both a time and a position, so a tempo change simply
-        /// changes how fast the playhead crosses that bar.
+        /// Work out the whole page layout for this song: one pixels-per-millisecond scale, and the
+        /// bars packed into lines. The scale is constant for the song, so the playhead moves at a
+        /// steady speed and it is the bars that come out narrow or wide when the tempo or the bar
+        /// length changes - which is what a live recording with a per-bar tempo map needs.
         /// </summary>
-        private double dbPlaybackPosition()
+        private void tBuildPageLayout()
         {
-            if (this.nBarTimeMs == null || this.nBarTimeMs.Length < 2) return 0.0;
-
-            long nNow = CSoundManager.rcPerformanceTimer.nCurrentTime;
-            int n = this.nBarSearchHint;
-            if (n < 0 || n > this.nBarTimeMs.Length - 2) n = 0;
-            while (n > 0 && nNow < this.nBarTimeMs[n]) n--;
-            while (n < this.nBarTimeMs.Length - 2 && nNow >= this.nBarTimeMs[n + 1]) n++;
-            this.nBarSearchHint = n;
-
-            long nSpan = this.nBarTimeMs[n + 1] - this.nBarTimeMs[n];
-            if (nSpan <= 0) return this.nBarPos[n];
-            double dbFraction = (double)(nNow - this.nBarTimeMs[n]) / nSpan;     // may be <0 or >1 at the ends
-            return this.nBarPos[n] + dbFraction * (this.nBarPos[n + 1] - this.nBarPos[n]);
-        }
-
-        /// <summary>Bar line chips carry both a time and a 384-per-bar position: that is our tempo map.</summary>
-        private void tBuildBarMap()
-        {
-            List<int> listMs = new List<int>(256);
-            List<int> listPos = new List<int>(256);
+            List<int> listBarMs = new List<int>(256);
+            List<int> listBarNo = new List<int>(256);
+            int nLastChipMs = 0;
             if (CDTXMania.DTX != null && CDTXMania.DTX.listChip != null)
             {
                 foreach (CChip chip in CDTXMania.DTX.listChip)
                 {
+                    if (chip.nPlaybackTimeMs > nLastChipMs) nLastChipMs = chip.nPlaybackTimeMs;
                     if (chip.nChannelNumber != EChannel.BarLine) continue;
-                    if (listPos.Count > 0 && listPos[listPos.Count - 1] == chip.nPlaybackPosition) continue;
-                    listMs.Add(chip.nPlaybackTimeMs);
-                    listPos.Add(chip.nPlaybackPosition);
+                    if (listBarNo.Count > 0 && listBarNo[listBarNo.Count - 1] == chip.nPlaybackPosition / 384) continue;
+                    listBarMs.Add(chip.nPlaybackTimeMs);
+                    listBarNo.Add(chip.nPlaybackPosition / 384);
                 }
             }
-            this.nBarTimeMs = listMs.ToArray();
-            this.nBarPos = listPos.ToArray();
+            this.nBarMs = listBarMs.ToArray();
+            this.nBarNumber = listBarNo.ToArray();
             this.nBarSearchHint = 0;
+            this.nLineSearchHint = 0;
+
+            int nBarsWanted = CDTXMania.ConfigIni.nDrumsNotationBarsPerLine;
+            if (nBarsWanted < 1 || nBarsWanted > 8) nBarsWanted = 4;
+            int nPreroll = CDTXMania.ConfigIni.nDrumsNotationPrerollMs;
+            if (nPreroll < 0 || nPreroll > 3000) nPreroll = PAGE_PREROLL_MS;
+            this.nPrerollMs = nPreroll;
+
+            // the last bar runs to the last chip, so it has a width like any other
+            this.nSongEndMs = (this.nBarMs.Length > 0) ? Math.Max(nLastChipMs + 1, this.nBarMs[this.nBarMs.Length - 1] + 1) : 1;
+
+            double dbAverageBarMs = 2000.0;     // a 4/4 bar at 120 BPM, if the chart has no bar lines
+            if (this.nBarMs.Length >= 2)
+                dbAverageBarMs = (double)(this.nBarMs[this.nBarMs.Length - 1] - this.nBarMs[0]) / (this.nBarMs.Length - 1);
+            if (dbAverageBarMs < 100.0) dbAverageBarMs = 100.0;
+
+            int nUsable = 1280 - LABEL_GUTTER_W - PAGE_RIGHT_MARGIN;
+            this.dbPxPerMs = nUsable / (nBarsWanted * dbAverageBarMs + this.nPrerollMs);
+            this.nPrerollPx = (int)(this.nPrerollMs * this.dbPxPerMs);
+            int nBarRoom = nUsable - this.nPrerollPx;       // what is left for the bars themselves
+
+            // greedy packing: whole bars, as many as fit; one that cannot fit at all gets its own line
+            List<int> listLineMs = new List<int>(64);
+            List<int> listLineBar = new List<int>(64);
+            for (int i = 0; i < this.nBarMs.Length; )
+            {
+                listLineMs.Add(this.nBarMs[i]);
+                listLineBar.Add(i);
+                // bars i..j-1 fit when bar j starts inside the room; j stops at i+1 for a bar that is
+                // wider than a whole line, which then gets a line to itself and is clipped
+                int j = i + 1;
+                while (j < this.nBarMs.Length && (this.nBarMs[j] - this.nBarMs[i]) * this.dbPxPerMs <= nBarRoom)
+                    j++;
+                i = j;
+            }
+            this.nLineMs = listLineMs.ToArray();
+            this.nLineFirstBar = listLineBar.ToArray();
         }
 
-        /// <summary>x of a position inside the current line. Notes are inset so a downbeat does not sit on the bar line.</summary>
-        private static int nPageX(double dbTicksIntoLine, int nTicksPerLine)
+        /// <summary>Which line is on screen: a line owns the time from its own pre-roll to the next line's.</summary>
+        private int nLineAt(long nNowMs)
         {
-            int nWidth = 1280 - LABEL_GUTTER_W - PAGE_RIGHT_MARGIN - PAGE_NOTE_INSET;
-            return LABEL_GUTTER_W + PAGE_NOTE_INSET + (int)(dbTicksIntoLine * nWidth / nTicksPerLine);
+            if (this.nLineMs == null || this.nLineMs.Length == 0) return 0;
+            int n = this.nLineSearchHint;
+            if (n < 0 || n >= this.nLineMs.Length) n = 0;
+            while (n > 0 && nNowMs < this.nLineMs[n] - this.nPrerollMs) n--;
+            while (n < this.nLineMs.Length - 1 && nNowMs >= this.nLineMs[n + 1] - this.nPrerollMs) n++;
+            this.nLineSearchHint = n;
+            return n;
+        }
+
+        /// <summary>Where a line begins on the clock: its first bar line, less the pre-roll run-in.</summary>
+        private long nLineOriginMs(int nLineIndex)
+        {
+            if (this.nLineMs == null || this.nLineMs.Length == 0) return -this.nPrerollMs;
+            if (nLineIndex < 0) nLineIndex = 0;
+            if (nLineIndex >= this.nLineMs.Length) nLineIndex = this.nLineMs.Length - 1;
+            return this.nLineMs[nLineIndex] - this.nPrerollMs;
+        }
+
+        /// <summary>x of a moment in time on the line that starts at nOriginMs. Strictly linear.</summary>
+        private int nPageX(double dbMs, long nOriginMs)
+        {
+            return LABEL_GUTTER_W + (int)((dbMs - nOriginMs) * this.dbPxPerMs);
         }
 
         /// <summary>The whole page: band, two systems, their bars and notes, the legend and the playhead.</summary>
         private void tDrawPage()
         {
-            if (this.nBarTimeMs == null) tBuildBarMap();
+            if (this.nLineMs == null) tBuildPageLayout();
 
-            int nBars = CDTXMania.ConfigIni.nDrumsNotationBarsPerLine;
-            if (nBars < 1 || nBars > 8) nBars = 4;
-            int nTicksPerLine = nBars * 384;
-
-            double dbPos = dbPlaybackPosition();
-            if (dbPos < 0.0) dbPos = 0.0;
-            int nLine = (int)(dbPos / nTicksPerLine);
-            this.nHeadX = nPageX(dbPos - (double)nLine * nTicksPerLine, nTicksPerLine);
+            long nNow = CSoundManager.rcPerformanceTimer.nCurrentTime;
+            int nLine = nLineAt(nNow);
+            this.nHeadX = nPageX(nNow, nLineOriginMs(nLine));
 
             // The playhead alternates: even lines play on the upper staff, odd lines on the lower
             // one. The staff it is not on always holds the line that comes next, so the page never
             // shifts vertically - only the staff the playhead just left changes its content.
             int nPlaying = nLine & 1;
-            long nNow = CSoundManager.rcPerformanceTimer.nCurrentTime;
             for (int k = 0; k < 2; k++)
             {
                 int nWanted = (k == nPlaying) ? nLine : nLine + 1;
@@ -514,8 +555,8 @@ namespace DTXMania
                 int nFade = (nSince >= PAGE_SWAP_FADE_MS || this.nSystemOldLine[k] < 0)
                             ? 255 : (int)(255L * nSince / PAGE_SWAP_FADE_MS);
                 if (nFade < 255)
-                    tDrawPageLine(this.nSystemOldLine[k], nBars, nTicksPerLine, 255 - nFade, false);
-                tDrawPageLine(this.nSystemLine[k], nBars, nTicksPerLine, nFade, true);
+                    tDrawPageLine(this.nSystemOldLine[k], 255 - nFade, false);
+                tDrawPageLine(this.nSystemLine[k], nFade, true);
                 tDrawLaneLabels();
             }
 
@@ -524,49 +565,63 @@ namespace DTXMania
                       PAGE_STEM_BOTTOM_DY - PAGE_STEM_TOP_DY + 12, 255);
         }
 
-        /// <summary>One staff line of the page: its bars, beat ticks, bar numbers and notes.</summary>
-        private void tDrawPageLine(int nLineIndex, int nBars, int nTicksPerLine, int nAlphaScale, bool bDrawGrid)
+        /// <summary>One staff line of the page: its pre-roll run-in, bars, beat ticks, numbers and notes.</summary>
+        private void tDrawPageLine(int nLineIndex, int nAlphaScale, bool bDrawGrid)
         {
             if (nLineIndex < 0 || nAlphaScale <= 0) return;
-            int nStartPos = nLineIndex * nTicksPerLine;
+            if (this.nLineMs == null || nLineIndex >= this.nLineMs.Length) return;
+
+            long nOrigin = nLineOriginMs(nLineIndex);
+            // up to the next line's first bar line: the last pre-roll worth of notes therefore appears
+            // both at the end of this line and at the start of the next one, where they are hit
+            long nEndMs = (nLineIndex + 1 < this.nLineMs.Length) ? this.nLineMs[nLineIndex + 1] : this.nSongEndMs;
             int nStaffH = 4 * this.nSpace + 1;
             int nStaffTop = this.nBaseY - 4 * this.nSpace;
+            int nRight = 1280 - PAGE_RIGHT_MARGIN;
 
-            for (int b = 0; b <= nBars; b++)
+            #region [ bar lines, their numbers and the beat ticks ]
+            int nFirst = this.nLineFirstBar[nLineIndex];
+            int nLast = (nLineIndex + 1 < this.nLineFirstBar.Length) ? this.nLineFirstBar[nLineIndex + 1] : this.nBarMs.Length;
+            for (int b = nFirst; b <= nLast && b < this.nBarMs.Length; b++)
             {
-                int x = nPageX(b * 384, nTicksPerLine) - PAGE_NOTE_INSET;
-                // the bar grid is the same for either line, so only the incoming pass draws it
-                if (bDrawGrid)
-                {
-                    tDrawCell(SHAPE_SOLID, C_WHITE, x - 1, nStaffTop, 2, nStaffH, 230);
-                    for (int q = 1; q < 4; q++)
-                        tDrawCell(SHAPE_SOLID, C_WHITE, nPageX(b * 384 + q * 96, nTicksPerLine) - PAGE_NOTE_INSET,
-                                  nStaffTop, 1, nStaffH, 70);
-                }
-                if (b == nBars) break;
+                int x = nPageX(this.nBarMs[b], nOrigin);
+                if (x > nRight) break;
+                if (bDrawGrid) tDrawCell(SHAPE_SOLID, C_WHITE, x - 1, nStaffTop, 2, nStaffH, 230);
+                if (b == nLast) break;                      // the next line's first bar closes this one
                 // the console font has no alpha, so the numbers change over at the half way point
                 if (nAlphaScale >= 128)
                     CDTXMania.actDisplayString.tPrint(x + 4, this.nBaseY + PAGE_BAR_NUMBER_DY,
-                                                      CCharacterConsole.EFontType.White, (nLineIndex * nBars + b).ToString());
+                                                      CCharacterConsole.EFontType.White, this.nBarNumber[b].ToString());
+                if (!bDrawGrid) continue;
+                long nBarEnd = (b + 1 < this.nBarMs.Length) ? this.nBarMs[b + 1] : this.nSongEndMs;
+                for (int q = 1; q < 4; q++)
+                {
+                    int xq = nPageX(this.nBarMs[b] + (nBarEnd - this.nBarMs[b]) * q / 4.0, nOrigin);
+                    if (xq <= nRight) tDrawCell(SHAPE_SOLID, C_WHITE, xq, nStaffTop, 1, nStaffH, 70);
+                }
             }
+            #endregion
 
-            // the page is laid out by bar, so the chips come straight from the chart, not from the
-            // engine's time-based feed
+            // the page is laid out on the clock, so the chips come straight from the chart, not from
+            // the engine's time-based feed. The window starts at the pre-roll, so the tail of the
+            // previous line's last bar is shown again here, where the player will actually hit it.
             this.listNotes.Clear();
             List<CChip> listChip = (CDTXMania.DTX != null) ? CDTXMania.DTX.listChip : null;
             if (listChip == null) return;
-            int nEndPos = nStartPos + nTicksPerLine;
             for (int i = 0; i < listChip.Count; i++)
             {
                 CChip chip = listChip[i];
-                if (chip.nPlaybackPosition >= nEndPos) break;        // listChip is sorted by position
-                if (chip.nPlaybackPosition < nStartPos) continue;
+                if (chip.nPlaybackTimeMs >= nEndMs) break;              // listChip is in time order
+                if (chip.nPlaybackTimeMs < nOrigin) continue;
                 STNote note;
                 if (!mapNotes.TryGetValue(chip.nChannelNumber, out note)) continue;
                 if (bAlreadyOnThisBeat(chip.nPlaybackPosition, note.nPos)) continue;
 
+                int x = nPageX(chip.nPlaybackTimeMs, nOrigin);
+                if (x > nRight) break;
+
                 STPendingNote pending;
-                pending.x = nPageX(chip.nPlaybackPosition - nStartPos, nTicksPerLine);
+                pending.x = x;
                 pending.nPlaybackPosition = chip.nPlaybackPosition;
                 pending.nAlpha = (chip.bHit ? PAGE_HIT_ALPHA : 255) * nAlphaScale / 255;
                 pending.note = note;
