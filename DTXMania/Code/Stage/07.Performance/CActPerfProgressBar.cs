@@ -195,6 +195,22 @@ namespace DTXMania
 			CDTXMania.t安全にDisposeする(ref this.txH進捗);
 		}
 
+		/// <summary>
+		/// Put the bar back to the stock tall vertical layout. The horizontal layout is a stored
+		/// flag, and OnActivate() returns early once the actor is active, so turning NotationView
+		/// off has to undo it explicitly or the bar stays horizontal for the rest of the session.
+		/// </summary>
+		public void tSetVerticalLayout()
+		{
+			if (!this.bHorizontal)
+			{
+				return;
+			}
+			this.bHorizontal = false;
+			CDTXMania.t安全にDisposeする(ref this.txH背景);
+			CDTXMania.t安全にDisposeする(ref this.txH進捗);
+		}
+
 		private void tHorizontalテクスチャの生成()
 		{
 			using (Bitmap bitmap = new Bitmap(nHorizontalW, nHorizontalH))

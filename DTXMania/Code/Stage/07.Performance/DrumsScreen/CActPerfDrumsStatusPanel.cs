@@ -175,12 +175,7 @@ namespace DTXMania
                 this.n本体X[i] = 0;
             }
 
-            // notation view puts the staff band across the top 65% of the screen, so the panel is
-            // drawn scaled down in the bottom left corner
-            bool bNotation = CDTXMania.ConfigIni.bDrumsNotationView;
-            this.fScale = bNotation ? CActPerfDrumsNotation.PANEL_SCALE : 1f;
-            this.n本体X[0] = bNotation ? CActPerfDrumsNotation.PANEL_X : 22;
-            this.n本体Y = bNotation ? CActPerfDrumsNotation.PANEL_Y : 250;
+            tApplyLayout();
 
             #endregion
                         
@@ -360,7 +355,8 @@ namespace DTXMania
                     bCLASSIC = true;
                 }
 
-                if (this.fScale != 1f) tApplyScale(this.fScale);
+                tApplyLayout();
+                tApplyScale(this.fScale);
                 this.txスキルパネル.tDraw2D(CDTXMania.app.Device, this.n本体X[i], this.n本体Y);
                 this.txネームプレート用文字.tDraw2D(CDTXMania.app.Device, this.n本体X[i], this.n本体Y);
 
@@ -450,7 +446,7 @@ namespace DTXMania
                     this.tx難易度パネル.tDraw2D( CDTXMania.app.Device, this.n本体X[i] + nS(14), this.n本体Y + nS(266), new Rectangle( base.rectDiffPanelPoint.X, base.rectDiffPanelPoint.Y, 60, 60 ) );
                 this.tレベル数字描画(this.n本体X[i] + nS(bCLASSIC == true ? 26 : 18), this.n本体Y + nS(290), str);
 
-                if (this.fScale != 1f) tApplyScale(1f);
+                tApplyScale(1f);
             }
             return 0;
 
@@ -480,6 +476,20 @@ namespace DTXMania
         private string strTitleName;
 
         private float fScale = 1f;
+
+        /// <summary>
+        /// Where and how big the panel is drawn. Evaluated every frame rather than once at
+        /// activation, so turning NotationView off puts the stock full-size panel straight back.
+        /// </summary>
+        private void tApplyLayout()
+        {
+            // notation view puts the staff band across the top 65% of the screen, so the panel is
+            // drawn scaled down in the bottom left corner
+            bool bNotation = CDTXMania.ConfigIni.bDrumsNotationView;
+            this.fScale = bNotation ? CActPerfDrumsNotation.PANEL_SCALE : 1f;
+            this.n本体X[0] = bNotation ? CActPerfDrumsNotation.PANEL_X : 22;
+            this.n本体Y = bNotation ? CActPerfDrumsNotation.PANEL_Y : 250;
+        }
 
         /// <summary>Scale a panel-relative offset. Identity unless the notation view shrank the panel.</summary>
         private int nS(int nOffset)

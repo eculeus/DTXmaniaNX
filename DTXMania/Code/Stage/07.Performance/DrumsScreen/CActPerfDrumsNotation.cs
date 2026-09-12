@@ -120,13 +120,24 @@ namespace DTXMania
         private const int POS_MIN = -1;             // lowest staff position any voice uses (left pedal)
         private const int POS_MAX = 12;             // highest (left crash on its second ledger line)
 
-        // Sprite sheet: 6 shape columns x 13 colour rows of 64x64 cells.
+        // Sprite sheet: 6 shape columns x 8 colour rows of 64x64 cells.
         private const int CELL = 64;
         private const int SHAPE_SOLID = 0, SHAPE_HEAD = 1, SHAPE_X = 2, SHAPE_CIRCLE_X = 3, SHAPE_DIAMOND = 4,
                           SHAPE_BOLD_X = 5;
-        private const int C_WHITE = 0, C_PURPLE = 1, C_YELLOW = 2, C_LIME = 3, C_RED = 4, C_ORANGE = 5,
-                          C_BLUE = 6, C_DEEPBLUE = 7, C_TEAL = 8, C_MAGENTA = 9, C_PINK = 10,
-                          C_DARK = 11, C_PLAYHEAD = 12;
+        // ----------------------------------------------------------------- //
+        //  Palette: notes are coloured by LIMB, the way Melodics does it, not //
+        //  by instrument. The row and the notehead shape say which drum it is;//
+        //  the colour says which hand or foot plays it. Toms whose sticking   //
+        //  alternate keep their own hues so they stay easy to tell apart.     //
+        // ----------------------------------------------------------------- //
+        private const int C_WHITE = 0,      // staff lines, ledger lines, stems, beams
+                          C_RIGHT = 1,      // 255,205,40  right hand / right foot
+                          C_LEFT  = 2,      // 60,170,255  left hand / left foot
+                          C_GREEN = 3,      // 92,224,116  hi tom
+                          C_RED   = 4,      // 255,72,72   lo tom
+                          C_ORANGE = 5,     // 255,153,41  floor tom
+                          C_DARK  = 6,      // band background
+                          C_PLAYHEAD = 7;
 
         private CTexture tx;
 
@@ -141,25 +152,23 @@ namespace DTXMania
             public STNote(int pos, int shape, int colour, bool up) { nPos = pos; nShape = shape; nColour = colour; bStemUp = up; }
         }
 
-        // Standard drum-set notation on a percussion staff, coloured like the vertical lanes
-        // (sampled from Graphics\7_chips_drums.png: BD/LBD purple, HH blue, SD yellow, HT green,
-        //  LT red, FT orange, LC magenta, LP pink). The cymbals were three near-identical blue x
-        //  heads, so the ride is now a teal diamond, the crash a bold white x on its ledger line,
-        //  and the hi tom moved to lime so it cannot be read as the ride.
+        // Standard drum-set notation on a percussion staff. The staff position and the notehead
+        // shape name the instrument (x = hi-hat, circled x = open hi-hat, diamond = ride, bold x =
+        // crash, ellipse = drum); the colour names the limb that plays it.
         private static readonly Dictionary<EChannel, STNote> mapNotes = new Dictionary<EChannel, STNote>
         {
-            { EChannel.HiHatClose,   new STNote( 9, SHAPE_X,        C_BLUE,     true ) },
-            { EChannel.Snare,        new STNote( 5, SHAPE_HEAD,     C_YELLOW,   true ) },
-            { EChannel.BassDrum,     new STNote( 1, SHAPE_HEAD,     C_PURPLE,   false) },
-            { EChannel.HighTom,      new STNote( 7, SHAPE_HEAD,     C_LIME,     true ) },
-            { EChannel.LowTom,       new STNote( 6, SHAPE_HEAD,     C_RED,      true ) },
-            { EChannel.Cymbal,       new STNote(10, SHAPE_BOLD_X,   C_WHITE,    true ) },
-            { EChannel.FloorTom,     new STNote( 3, SHAPE_HEAD,     C_ORANGE,   true ) },
-            { EChannel.HiHatOpen,    new STNote( 9, SHAPE_CIRCLE_X, C_BLUE,     true ) },
-            { EChannel.RideCymbal,   new STNote( 8, SHAPE_DIAMOND,  C_TEAL,     true ) },
-            { EChannel.LeftCymbal,   new STNote(12, SHAPE_X,        C_MAGENTA,  true ) },
-            { EChannel.LeftPedal,    new STNote(-1, SHAPE_X,        C_PINK,     false) },
-            { EChannel.LeftBassDrum, new STNote( 1, SHAPE_HEAD,     C_PURPLE,   false) },
+            { EChannel.HiHatClose,   new STNote( 9, SHAPE_X,        C_RIGHT, true ) },
+            { EChannel.HiHatOpen,    new STNote( 9, SHAPE_CIRCLE_X, C_RIGHT, true ) },
+            { EChannel.RideCymbal,   new STNote( 8, SHAPE_DIAMOND,  C_RIGHT, true ) },
+            { EChannel.Cymbal,       new STNote(10, SHAPE_BOLD_X,   C_RIGHT, true ) },
+            { EChannel.FloorTom,     new STNote( 3, SHAPE_HEAD,     C_ORANGE,true ) },
+            { EChannel.BassDrum,     new STNote( 1, SHAPE_HEAD,     C_RIGHT, false) },
+            { EChannel.Snare,        new STNote( 5, SHAPE_HEAD,     C_LEFT,  true ) },
+            { EChannel.LeftCymbal,   new STNote(12, SHAPE_X,        C_LEFT,  true ) },
+            { EChannel.LeftPedal,    new STNote(-1, SHAPE_X,        C_LEFT,  false) },
+            { EChannel.LeftBassDrum, new STNote( 1, SHAPE_HEAD,     C_LEFT,  false) },
+            { EChannel.HighTom,      new STNote( 7, SHAPE_HEAD,     C_GREEN, true ) },
+            { EChannel.LowTom,       new STNote( 6, SHAPE_HEAD,     C_RED,   true ) },
         };
 
         /// <summary>One entry of the legend down the left edge, indexed by ELane (0..9).</summary>
@@ -174,16 +183,16 @@ namespace DTXMania
         // Indexed exactly like CStagePerfCommonScreen.nチャンネル0Atoレーン07 / ELane.
         private static readonly STLaneLabel[] stLaneLabels = new STLaneLabel[]
         {
-            new STLaneLabel(12, C_MAGENTA,  "L.CRASH"),     // 0  LC
-            new STLaneLabel( 9, C_BLUE,     "HI-HAT" ),     // 1  HH (and open hi-hat)
-            new STLaneLabel( 5, C_YELLOW,   "SNARE"  ),     // 2  SD
-            new STLaneLabel( 1, C_PURPLE,   "KICK"   ),     // 3  BD
-            new STLaneLabel( 7, C_LIME,     "HI TOM" ),     // 4  HT
-            new STLaneLabel( 6, C_RED,      "LO TOM" ),     // 5  LT
-            new STLaneLabel( 3, C_ORANGE,   "FLOOR"  ),     // 6  FT
-            new STLaneLabel(10, C_WHITE,    "CRASH"  ),     // 7  CY
-            new STLaneLabel(-1, C_PINK,     "L.PEDAL"),     // 8  LP (and left bass drum)
-            new STLaneLabel( 8, C_TEAL,     "RIDE"   ),     // 9  RD
+            new STLaneLabel(12, C_LEFT,  "L.CRASH"),        // 0  LC
+            new STLaneLabel( 9, C_RIGHT, "HI-HAT" ),        // 1  HH (and open hi-hat)
+            new STLaneLabel( 5, C_LEFT,  "SNARE"  ),        // 2  SD
+            new STLaneLabel( 1, C_RIGHT, "KICK"   ),        // 3  BD
+            new STLaneLabel( 7, C_GREEN, "HI TOM" ),        // 4  HT
+            new STLaneLabel( 6, C_RED,   "LO TOM" ),        // 5  LT
+            new STLaneLabel( 3, C_ORANGE,"FLOOR"  ),        // 6  FT
+            new STLaneLabel(10, C_RIGHT, "CRASH"  ),        // 7  CY
+            new STLaneLabel(-1, C_LEFT,  "L.PEDAL"),        // 8  LP (and left bass drum)
+            new STLaneLabel( 8, C_RIGHT, "RIDE"   ),        // 9  RD
         };
 
         /// <summary>A chip the stage has handed us this frame, ready to be laid out.</summary>
@@ -286,17 +295,12 @@ namespace DTXMania
         {
             switch (nColour)
             {
-                case C_PURPLE:   return Color.FromArgb(173, 125, 255);
-                case C_YELLOW:   return Color.FromArgb(255, 226,  77);
-                case C_LIME:     return Color.FromArgb(150, 230,  60);
-                case C_RED:      return Color.FromArgb(255,  72,  72);
-                case C_ORANGE:   return Color.FromArgb(255, 153,  41);
-                case C_BLUE:     return Color.FromArgb( 77, 179, 255);
-                case C_DEEPBLUE: return Color.FromArgb( 77, 134, 255);
-                case C_TEAL:     return Color.FromArgb(  0, 190, 160);
-                case C_MAGENTA:  return Color.FromArgb(255,  61, 140);
-                case C_PINK:     return Color.FromArgb(255, 134, 200);
-                default:         return Color.White;
+                case C_RIGHT:  return Color.FromArgb(255, 205,  40);
+                case C_LEFT:   return Color.FromArgb( 60, 170, 255);
+                case C_GREEN:  return Color.FromArgb( 92, 224, 116);
+                case C_RED:    return Color.FromArgb(255,  72,  72);
+                case C_ORANGE: return Color.FromArgb(255, 153,  41);
+                default:       return Color.White;
             }
         }
 
