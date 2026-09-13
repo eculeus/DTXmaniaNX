@@ -596,7 +596,7 @@ namespace DTXMania
                     // so a report of the idle staff changing can be checked against the timeline.
                     System.Diagnostics.Trace.TraceInformation("Notation page: t={0} line {1}->{2}: staff {3} {4}->{5}{6}",
                         nNow, this.nPageLastLine, nLine, k, this.nSystemLine[k], nWanted,
-                        (k != nPlaying && this.nPageLastLine >= 0 && nLine == this.nPageLastLine + 1) ? " (UNEXPECTED: idle staff)" : "");
+                        (k == nPlaying && this.nPageLastLine >= 0 && nLine == this.nPageLastLine + 1) ? " (UNEXPECTED: the staff being entered changed)" : "");
                     this.nSystemOldLine[k] = this.nSystemLine[k];
                     this.nSystemLine[k] = nWanted;
                     this.nSystemFadeMs[k] = nNow;
@@ -667,10 +667,14 @@ namespace DTXMania
                 if (x > nRight) break;
                 if (bDrawGrid) tDrawCell(SHAPE_SOLID, C_WHITE, x - 1, nStaffTop, 2, nStaffH, 230);
                 if (b == nLast) break;                      // the next line's first bar closes this one
-                // the console font has no alpha, so the numbers change over at the half way point
-                if (nAlphaScale >= 128 && this.nBarNumber[b] != 0)   // bar 0 is the lead-in: no number
+                // The loader puts an empty bar in front of the chart (CDTX: n小節番号++), so internal
+                // bar k is bar k-1 of the DTX file. Numbers are printed as the file counts them, so
+                // they match the chart and the sheet music it came from; the loader's empty bar and
+                // the file's bar 0 (the lead-in) get no number. The console font has no alpha, so
+                // the numbers change over at the half way point of a crossfade.
+                if (nAlphaScale >= 128 && this.nBarNumber[b] >= 2)
                     CDTXMania.actDisplayString.tPrint(x + 4, this.nBaseY + PAGE_BAR_NUMBER_DY,
-                                                      CCharacterConsole.EFontType.White, this.nBarNumber[b].ToString());
+                                                      CCharacterConsole.EFontType.White, (this.nBarNumber[b] - 1).ToString());
             }
             // Beat ticks come from the engine's own beat-line chips. Chip positions are always 384
             // per bar whatever the bar's length, so they cannot tell a 1-beat pickup from a 4/4 bar;
