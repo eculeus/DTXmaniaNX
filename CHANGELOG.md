@@ -9,6 +9,20 @@ Builds are produced by GitHub Actions (`.github/workflows/build.yml`, Release x8
 extracting the zip over an existing DTXManiaNX folder; `Config.ini` is not included, so key
 bindings and settings are kept.
 
+## 1.5.0-beta.12 — 2026-09-13
+
+- Page mode: the staff lines of a line now stop at its closing bar line. A line that holds fewer
+  bars ends early and the rest of the row is empty, so what is staff is a bar.
+- Page mode: beat ticks now really follow each bar's length. beta.11 claimed this but computed
+  them from chip positions, which are always 384 per bar in DTXMania whatever the bar length, so
+  every bar was still quartered. The ticks now come from the loader's own beat-line chips: none in
+  a one-beat pickup, two in a 3/4 bar.
+- Page mode: every staff change is written to `DTXManiaLog.txt` with the song time and the line
+  numbers, and flagged when the idle staff changes while the song runs straight through (which
+  should not happen). The page layout (bar times, lines) is logged too.
+- CI smoke chart: bar lengths are reset after the pickup and the 3/4 bar (a DTX bar length stays
+  in force until it is set again), so the smoke frames show the intended structure.
+
 ## 1.5.0-beta.11 — 2026-09-12
 
 - Page mode: a bar is placed on a line only if the whole bar fits, so lines end early instead of

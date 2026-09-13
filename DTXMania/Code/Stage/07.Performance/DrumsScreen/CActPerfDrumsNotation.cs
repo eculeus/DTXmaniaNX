@@ -200,8 +200,10 @@ namespace DTXMania
         private static bool bPage { get { return CDTXMania.ConfigIni.bDrumsNotationPage; } }
 
         private int[] nBarMs;                       // page view: bar start times ...
-        private int[] nBarPos;                      // ... their playback positions (384 per 4/4 bar) ...
         private int[] nBarNumber;                   // ... and the bar number printed at each one
+        private int[] nBeatMs;                      // the engine's own beat lines (they already follow
+                                                    // each bar's length: none in a 1-beat pickup, two in 3/4)
+        private int nPageLastLine = -1;             // the line the playhead was on last frame (log only)
         private int[] nLineMs;                      // the time each staff line starts at ...
         private int[] nLineFirstBar;                // ... and its first bar's index in nBarMs
         private double dbPxPerMs;                   // one scale for the whole song, so the playhead is linear
@@ -420,24 +422,27 @@ namespace DTXMania
         private void tBuildPageLayout()
         {
             List<int> listBarMs = new List<int>(256);
-            List<int> listBarPos = new List<int>(256);
             List<int> listBarNo = new List<int>(256);
+            List<int> listBeatMs = new List<int>(1024);
             int nLastChipMs = 0;
             if (CDTXMania.DTX != null && CDTXMania.DTX.listChip != null)
             {
                 foreach (CChip chip in CDTXMania.DTX.listChip)
                 {
                     if (chip.nPlaybackTimeMs > nLastChipMs) nLastChipMs = chip.nPlaybackTimeMs;
+                    if (chip.nChannelNumber == EChannel.BeatLine) { listBeatMs.Add(chip.nPlaybackTimeMs); continue; }
                     if (chip.nChannelNumber != EChannel.BarLine) continue;
                     if (listBarNo.Count > 0 && listBarNo[listBarNo.Count - 1] == chip.nPlaybackPosition / 384) continue;
                     listBarMs.Add(chip.nPlaybackTimeMs);
-                    listBarPos.Add(chip.nPlaybackPosition);
                     listBarNo.Add(chip.nPlaybackPosition / 384);
                 }
             }
             this.nBarMs = listBarMs.ToArray();
-            this.nBarPos = listBarPos.ToArray();
             this.nBarNumber = listBarNo.ToArray();
+            this.nBeatMs = listBeatMs.ToArray();
+            Array.Sort(this.nBeatMs);
+            this.nPageLastLine = -1;
+            for (int k = 0; k < 2; k++) { this.nSystemLine[k] = -1; this.nSystemOldLine[k] = -1; }
             this.nBarSearchHint = 0;
             this.nLineSearchHint = 0;
 
@@ -492,6 +497,46 @@ namespace DTXMania
             }
             if (this.nLineFirstBar.Length > 0 && this.nLineFirstBar[0] != 0)
                 System.Diagnostics.Trace.TraceWarning("Notation page: the first line starts at bar index {0}, not 0.", this.nLineFirstBar[0]);
+
+            // the layout in the log, so a photo of a wrong page can be checked against the numbers
+            System.Text.StringBuilder sb = new System.Text.StringBuilder(512);
+            sb.AppendFormat("Notation page: {0} bars, {1} beat lines, {2} lines, {3:F4} px/ms, pre-roll {4} ms, song end {5} ms; bars:",
+                            this.nBarMs.Length, this.nBeatMs.Length, this.nLineMs.Length, this.dbPxPerMs, this.nPrerollMs, this.nSongEndMs);
+            for (int b = 0; b < this.nBarMs.Length && b < 40; b++)
+                sb.AppendFormat(" {0}@{1}", this.nBarNumber[b], this.nBarMs[b]);
+            sb.Append("; lines:");
+            for (int k = 0; k < this.nLineMs.Length; k++)
+                sb.AppendFormat(" {0}:bar{1}@{2}", k, this.nBarNumber[this.nLineFirstBar[k]], this.nLineMs[k]);
+            System.Diagnostics.Trace.TraceInformation(sb.ToString());
+        }
+
+        /// <summary>When a line's last bar ends: the next line's first bar line, or the end of the song.</summary>
+        private long nLineEndMs(int nLineIndex)
+        {
+            if (this.nLineMs == null || nLineIndex < 0 || nLineIndex >= this.nLineMs.Length) return 0;
+            return (nLineIndex + 1 < this.nLineMs.Length) ? this.nLineMs[nLineIndex + 1] : this.nSongEndMs;
+        }
+
+        /// <summary>
+        /// How far the staff of a line reaches, in pixels from the gutter: to its closing bar line,
+        /// so a line that holds fewer bars ends early instead of running on as empty staff. 0 when
+        /// there is no such line (the staff after the last line of the song).
+        /// </summary>
+        private int nLineStaffWidth(int nLineIndex)
+        {
+            if (this.nLineMs == null || nLineIndex < 0 || nLineIndex >= this.nLineMs.Length) return 0;
+            int x = nPageX(nLineEndMs(nLineIndex), nLineOriginMs(nLineIndex)) + 1;   // the bar line is 2 px wide, at x-1
+            if (x > 1280 - PAGE_RIGHT_MARGIN) x = 1280 - PAGE_RIGHT_MARGIN;
+            return Math.Max(0, x - LABEL_GUTTER_W);
+        }
+
+        /// <summary>The five staff lines of one system between two x offsets from the gutter.</summary>
+        private void tDrawPageStaffLines(int nBottom, int x0, int x1, int nAlpha)
+        {
+            if (x1 <= x0 || nAlpha <= 0) return;
+            for (int i = 0; i < 5; i++)
+                tDrawCell(SHAPE_SOLID, C_WHITE, LABEL_GUTTER_W + x0, nBottom - i * PAGE_SPACE - nSc(LINE_H) / 2,
+                          x1 - x0, nSc(LINE_H), nAlpha);
         }
 
         /// <summary>When a bar ends: the next bar line, or the end of the song for the last one.</summary>
@@ -546,11 +591,18 @@ namespace DTXMania
                 int nWanted = (k == nPlaying) ? nLine : nLine + 1;
                 if (this.nSystemLine[k] != nWanted)
                 {
+                    // Only the staff the playhead just left should ever change while the song runs
+                    // straight through; the other one already holds the line being entered. Logged
+                    // so a report of the idle staff changing can be checked against the timeline.
+                    System.Diagnostics.Trace.TraceInformation("Notation page: t={0} line {1}->{2}: staff {3} {4}->{5}{6}",
+                        nNow, this.nPageLastLine, nLine, k, this.nSystemLine[k], nWanted,
+                        (k != nPlaying && this.nPageLastLine >= 0 && nLine == this.nPageLastLine + 1) ? " (UNEXPECTED: idle staff)" : "");
                     this.nSystemOldLine[k] = this.nSystemLine[k];
                     this.nSystemLine[k] = nWanted;
                     this.nSystemFadeMs[k] = nNow;
                 }
             }
+            this.nPageLastLine = nLine;
 
             int nPlayBottom = PAGE_BOTTOM_0 + nPlaying * PAGE_SYSTEM_DY;
             nActiveBaseY = nPlayBottom;
@@ -565,17 +617,26 @@ namespace DTXMania
                 int nBottom = PAGE_BOTTOM_0 + k * PAGE_SYSTEM_DY;
                 tSetSystem(nBottom, PAGE_SPACE, nBottom + PAGE_STEM_TOP_DY, nBottom + PAGE_STEM_BOTTOM_DY);
                 if (k == nPlaying) tDrawLaneFlashes();      // the flash belongs to the line being played
-                for (int i = 0; i < 5; i++)
-                    tDrawCell(SHAPE_SOLID, C_WHITE, LABEL_GUTTER_W, nBottom - i * PAGE_SPACE - nSc(LINE_H) / 2,
-                              1280 - LABEL_GUTTER_W - PAGE_RIGHT_MARGIN, nSc(LINE_H), 235);
 
                 long nSince = nNow - this.nSystemFadeMs[k];
                 int nFade = (nSince >= PAGE_SWAP_FADE_MS || this.nSystemOldLine[k] < 0)
                             ? 255 : (int)(255L * nSince / PAGE_SWAP_FADE_MS);
+
+                // The staff runs from the gutter to the line's closing bar line only, so where a
+                // line holds fewer bars the staff stops there and the rest of the row is empty: what
+                // is staff is a bar. During the crossfade the part both lines share stays solid and
+                // only the difference in length fades with the line it belongs to.
+                int nNewW = nLineStaffWidth(this.nSystemLine[k]);
+                int nOldW = (nFade < 255) ? nLineStaffWidth(this.nSystemOldLine[k]) : nNewW;
+                int nCommonW = Math.Min(nNewW, nOldW);
+                tDrawPageStaffLines(nBottom, 0, nCommonW, 235);
+                if (nNewW > nCommonW) tDrawPageStaffLines(nBottom, nCommonW, nNewW, 235 * nFade / 255);
+                else if (nOldW > nCommonW) tDrawPageStaffLines(nBottom, nCommonW, nOldW, 235 * (255 - nFade) / 255);
+
                 if (nFade < 255)
                     tDrawPageLine(this.nSystemOldLine[k], 255 - nFade, false);
                 tDrawPageLine(this.nSystemLine[k], nFade, true);
-                tDrawLaneLabels();
+                if (nNewW > 0 || nOldW > 0) tDrawLaneLabels();     // no legend for a staff that is not there
             }
 
             // the playhead sweeps whichever staff is being played
@@ -610,18 +671,20 @@ namespace DTXMania
                 if (nAlphaScale >= 128 && this.nBarNumber[b] != 0)   // bar 0 is the lead-in: no number
                     CDTXMania.actDisplayString.tPrint(x + 4, this.nBaseY + PAGE_BAR_NUMBER_DY,
                                                       CCharacterConsole.EFontType.White, this.nBarNumber[b].ToString());
-                if (!bDrawGrid) continue;
-                long nBarEnd = nBarEndMs(b);
-                // how many beats this bar really has: a 1-beat pickup gets no interior tick, a 3/4
-                // bar gets two, instead of always quartering whatever the bar happens to be
-                int nBeats = 4;
-                if (b + 1 < this.nBarPos.Length)
-                    nBeats = (this.nBarPos[b + 1] - this.nBarPos[b]) / 96;
-                if (nBeats < 1) nBeats = 1;
-                for (int q = 1; q < nBeats; q++)
+            }
+            // Beat ticks come from the engine's own beat-line chips. Chip positions are always 384
+            // per bar whatever the bar's length, so they cannot tell a 1-beat pickup from a 4/4 bar;
+            // the loader's beat lines are placed with the bar length applied, so a pickup gets none
+            // and a 3/4 bar gets two. Only the line's own bars get ticks, not the pre-roll run-in.
+            if (bDrawGrid && this.nBeatMs != null && this.nBeatMs.Length > 0)
+            {
+                int i0 = Array.BinarySearch(this.nBeatMs, (int)this.nLineMs[nLineIndex]);
+                if (i0 < 0) i0 = ~i0;
+                for (int i = i0; i < this.nBeatMs.Length && this.nBeatMs[i] < nEndMs; i++)
                 {
-                    int xq = nPageX(this.nBarMs[b] + (nBarEnd - this.nBarMs[b]) * q / (double)nBeats, nOrigin);
-                    if (xq <= nRight) tDrawCell(SHAPE_SOLID, C_WHITE, xq, nStaffTop, 1, nStaffH, 70);
+                    int xq = nPageX(this.nBeatMs[i], nOrigin);
+                    if (xq > nRight) break;
+                    tDrawCell(SHAPE_SOLID, C_WHITE, xq, nStaffTop, 1, nStaffH, 70);
                 }
             }
             #endregion
