@@ -9,6 +9,14 @@ Builds are produced by GitHub Actions (`.github/workflows/build.yml`, Release x8
 extracting the zip over an existing DTXManiaNX folder; `Config.ini` is not included, so key
 bindings and settings are kept.
 
+## 1.5.0-beta.14 — 2026-09-14
+
+- Page mode: notes are placed as engraved, not as timed. Beat 1 no longer sits on the bar line:
+  each bar's notes are mapped into the room between its two bar lines less a gap after the
+  opening line (14 px) and a smaller one before the closing line (6 px), so a note is never on or
+  outside its bar's lines. Bar lines, beat ticks and the staff length are unchanged. The playhead
+  follows the notes, so it skips the gap at every bar line instead of drifting away from them.
+
 ## 1.5.0-beta.13 — 2026-09-13
 
 - Page mode: every bar is drawn on exactly one staff. The pre-roll is gone: a line's notes ran on
