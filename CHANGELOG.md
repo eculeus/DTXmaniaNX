@@ -9,6 +9,18 @@ Builds are produced by GitHub Actions (`.github/workflows/build.yml`, Release x8
 extracting the zip over an existing DTXManiaNX folder; `Config.ini` is not included, so key
 bindings and settings are kept.
 
+## 1.5.0-beta.15 — 2026-09-14
+
+- Page mode: bar lines are drawn 34 px before their beat 1 (about a staff space plus a note head,
+  as engraved), and notes, beat ticks and the playhead are placed exactly where time puts them
+  again. This replaces beta.14's note map, which moved the notes instead: the playhead had to
+  jump the gap at every bar line, and that made the first note of a bar feel late (judgement was
+  never affected, only where the playhead was). When a bar ends with a note closer than that to
+  the next downbeat (a 16th pickup), that bar line is put half way between the note and beat 1,
+  so a note is never on the wrong side of a bar line.
+- Page mode: the staff of a line begins at its first bar line instead of at the label gutter. The
+  stub of staff before the first bar line looked like a sliver of the previous bar.
+
 ## 1.5.0-beta.14 — 2026-09-14
 
 - Page mode: notes are placed as engraved, not as timed. Beat 1 no longer sits on the bar line:
