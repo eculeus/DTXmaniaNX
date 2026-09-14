@@ -188,8 +188,9 @@ namespace DTXMania
 		private const int n1行目のY = 25;
 		private const int nMaxRows = 5;
 		// 10pt での実測: 数字7桁=53px, "100.00%"=55px。各列がぶつからないように決めた値。
-		private const int nName最大幅 = 94;
-		private const int nScore右端 = 176;
+		private const int nName最大幅 = 62;
+		private const int nScore右端 = 140;
+		private const int nGrade左端 = 148;      // the letter grade sits between the score and the rate
 		private const int n見出し右側最大幅 = 124;
 
 		private bool b表の再生成が必要;
@@ -246,6 +247,7 @@ namespace DTXMania
 							this.t左寄せで描画する( graphics, this.prvf行, ( i + 1 ).ToString( CultureInfo.InvariantCulture ) + ".", 6, y, color );
 							this.t左寄せで描画する( graphics, this.prvf行, entry.strName, 24, y, color, nName最大幅 );
 							this.t右寄せで描画する( graphics, this.prvf行, entry.nScore.ToString( CultureInfo.InvariantCulture ), nScore右端, y, color );
+							this.t左寄せで描画する( graphics, this.prvf行, CHighScores.strRankLetter( entry.nRankValue ), nGrade左端, y, color );
 							this.t右寄せで描画する( graphics, this.prvf行, entry.dbAchievement.ToString( "0.00", CultureInfo.InvariantCulture ) + "%", n表の幅 - 6, y, color );
 						}
 					}

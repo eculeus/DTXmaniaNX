@@ -596,10 +596,24 @@ namespace DTXMania
             if (this.nLineMs == null || this.nLineMs.Length == 0) return 0;
             int n = this.nLineSearchHint;
             if (n < 0 || n >= this.nLineMs.Length) n = 0;
-            while (n > 0 && nNowMs < this.nLineMs[n]) n--;
-            while (n < this.nLineMs.Length - 1 && nNowMs >= this.nLineMs[n + 1]) n++;
+            while (n > 0 && nNowMs < nLineEnterMs(n)) n--;
+            while (n < this.nLineMs.Length - 1 && nNowMs >= nLineEnterMs(n + 1)) n++;
             this.nLineSearchHint = n;
             return n;
+        }
+
+        /// <summary>
+        /// When the playhead moves onto a line: as it reaches the line's first bar line, which is
+        /// drawn its gap before beat 1. So the playhead leaves the previous line at that line's
+        /// closing bar line (the same moment) instead of running past it, and arrives at beat 1 on
+        /// time. No note falls in the gap: it is never more than half way back to the previous note.
+        /// </summary>
+        private long nLineEnterMs(int nLineIndex)
+        {
+            if (this.nLineMs == null || nLineIndex < 0 || nLineIndex >= this.nLineMs.Length) return 0;
+            if (nLineIndex == 0) return long.MinValue / 2;
+            int nGapPx = nBarLineGapPx(this.nLineFirstBar[nLineIndex]);
+            return this.nLineMs[nLineIndex] - (long)(nGapPx / this.dbPxPerMs);
         }
 
         /// <summary>Where a line begins on the clock: its first bar line.</summary>
@@ -638,7 +652,7 @@ namespace DTXMania
             long nT0 = this.nLineMs[nLine];
             long nBar = nBarEndMs(this.nLineFirstBar[nLine]) - nT0;
             if (nBar <= 0) nBar = 1000;
-            long nDeadline = nLineEndMs(nLine) - PAGE_SWAP_LEAD_MS;
+            long nDeadline = ((nLine + 1 < this.nLineMs.Length) ? nLineEnterMs(nLine + 1) : (long)this.nSongEndMs) - PAGE_SWAP_LEAD_MS;
             long nStart = nT0 + nBar / 2;
             long nEnd = nStart + nBar;
             if (nEnd > nDeadline)

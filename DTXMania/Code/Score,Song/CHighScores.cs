@@ -21,6 +21,22 @@ namespace DTXMania
 		public const int nMaxNameLength = 12;
 		public const string strDefaultName = "PLAYER";
 
+		/// <summary>The letter grade (SS, S, A ... E) for a stored rank value, "-" if unknown.</summary>
+		public static string strRankLetter( int nRankValue )
+		{
+			switch( nRankValue )
+			{
+				case (int) CScoreIni.ERANK.SS: return "SS";
+				case (int) CScoreIni.ERANK.S: return "S";
+				case (int) CScoreIni.ERANK.A: return "A";
+				case (int) CScoreIni.ERANK.B: return "B";
+				case (int) CScoreIni.ERANK.C: return "C";
+				case (int) CScoreIni.ERANK.D: return "D";
+				case (int) CScoreIni.ERANK.E: return "E";
+				default: return "-";
+			}
+		}
+
 
 		// 1件分の記録
 
