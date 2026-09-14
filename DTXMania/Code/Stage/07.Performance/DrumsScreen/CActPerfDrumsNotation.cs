@@ -97,10 +97,11 @@ namespace DTXMania
                                                                     // playhead here, not the whole played line
         public const int PAGE_LEFT_PAD = 24;                        // px between the gutter and a line's first bar
                                                                     // line, so the first note's head is not clipped
-        public const int PAGE_BAR_PAD_L = 14;                       // engraving gap after a bar line before the
-                                                                    // first beat, and ...
-        public const int PAGE_BAR_PAD_R = 6;                        // ... before the closing bar line: no note
-                                                                    // ever sits on, or outside, its bar lines
+        public const int PAGE_BAR_GAP = 34;                         // a bar line is drawn this far BEFORE its beat
+                                                                    // 1 (about a staff space plus a note head, as
+                                                                    // engraved); notes and the playhead stay exactly
+                                                                    // where time puts them. Less when the previous
+                                                                    // bar ends with a note closer than that.
         public const int PAGE_SWAP_LEAD_MS = 300;                   // a staff has finished fading its next line in
                                                                     // at least this long before that line is played
 
@@ -205,6 +206,7 @@ namespace DTXMania
 
         private int[] nBarMs;                       // page view: bar start times ...
         private int[] nBarNumber;                   // ... and the bar number printed at each one
+        private int[] nBarGapPx;                    // how far before its beat 1 each bar line is drawn
         private int[] nBeatMs;                      // the engine's own beat lines (they already follow
                                                     // each bar's length: none in a 1-beat pickup, two in 3/4)
         private int nPageLastLine = -1;             // the line the playhead was on last frame (log only)
@@ -432,17 +434,22 @@ namespace DTXMania
             List<int> listBarMs = new List<int>(256);
             List<int> listBarNo = new List<int>(256);
             List<int> listBeatMs = new List<int>(1024);
+            List<int> listBarPrevNote = new List<int>(256);   // the last drum note before each bar line
             int nLastChipMs = 0;
+            int nLastNoteMs = -1;
             if (CDTXMania.DTX != null && CDTXMania.DTX.listChip != null)
             {
                 foreach (CChip chip in CDTXMania.DTX.listChip)
                 {
                     if (chip.nPlaybackTimeMs > nLastChipMs) nLastChipMs = chip.nPlaybackTimeMs;
                     if (chip.nChannelNumber == EChannel.BeatLine) { listBeatMs.Add(chip.nPlaybackTimeMs); continue; }
+                    if (mapNotes.ContainsKey(chip.nChannelNumber)) { nLastNoteMs = chip.nPlaybackTimeMs; continue; }
                     if (chip.nChannelNumber != EChannel.BarLine) continue;
                     if (listBarNo.Count > 0 && listBarNo[listBarNo.Count - 1] == chip.nPlaybackPosition / 384) continue;
                     listBarMs.Add(chip.nPlaybackTimeMs);
                     listBarNo.Add(chip.nPlaybackPosition / 384);
+                    // a note on beat 1 can sort before its own bar line: only notes strictly earlier count
+                    listBarPrevNote.Add(nLastNoteMs < chip.nPlaybackTimeMs ? nLastNoteMs : -1);
                 }
             }
             this.nBarMs = listBarMs.ToArray();
@@ -472,6 +479,22 @@ namespace DTXMania
             int nBarRoom = 1280 - LABEL_GUTTER_W - PAGE_LEFT_PAD - PAGE_RIGHT_MARGIN;   // room for the bars
             this.dbPxPerMs = nBarRoom / (nBarsWanted * dbAverageBarMs);
 
+            // Each bar line is drawn PAGE_BAR_GAP before its beat 1, as engraved, so the first note
+            // stands clear of it. When the previous bar ends with a note closer than that (a 16th
+            // pickup), the line is put half way between that note and beat 1 instead, so a note
+            // never ends up on the wrong side of a bar line.
+            this.nBarGapPx = new int[this.nBarMs.Length];
+            for (int b = 0; b < this.nBarMs.Length; b++)
+            {
+                int nGap = PAGE_BAR_GAP;
+                if (listBarPrevNote[b] >= 0)
+                {
+                    int nDist = (int)((this.nBarMs[b] - listBarPrevNote[b]) * this.dbPxPerMs);
+                    if (nDist / 2 < nGap) nGap = Math.Max(0, nDist / 2);
+                }
+                this.nBarGapPx[b] = nGap;
+            }
+
             // greedy packing: whole bars, as many as fit; one that cannot fit at all gets its own line
             List<int> listLineMs = new List<int>(64);
             List<int> listLineBar = new List<int>(64);
@@ -483,7 +506,7 @@ namespace DTXMania
                 // drawn past the right edge and lines simply come out uneven. The one exception is
                 // a bar longer than a whole line: it gets a line to itself and is clipped.
                 int j = i;
-                while (j < this.nBarMs.Length && (nBarEndMs(j) - this.nBarMs[i]) * this.dbPxPerMs <= nBarRoom)
+                while (j < this.nBarMs.Length && (nBarEndMs(j) - this.nBarMs[i]) * this.dbPxPerMs + PAGE_BAR_GAP <= nBarRoom)
                     j++;
                 if (j == i) j = i + 1;
                 i = j;
@@ -528,9 +551,23 @@ namespace DTXMania
         private int nLineStaffWidth(int nLineIndex)
         {
             if (this.nLineMs == null || nLineIndex < 0 || nLineIndex >= this.nLineMs.Length) return 0;
-            int x = nPageX(nLineEndMs(nLineIndex), nLineOriginMs(nLineIndex)) + 1;   // the bar line is 2 px wide, at x-1
+            int x = nPageX(nLineEndMs(nLineIndex), nLineIndex) - nBarLineGapPx(nLineEndBar(nLineIndex)) + 1;   // the bar line is 2 px wide, at x-1
             if (x > 1280 - PAGE_RIGHT_MARGIN) x = 1280 - PAGE_RIGHT_MARGIN;
             return Math.Max(0, x - LABEL_GUTTER_W);
+        }
+
+        /// <summary>Index in nBarMs of the bar line that closes a line, or -1 for the song's end.</summary>
+        private int nLineEndBar(int nLineIndex)
+        {
+            if (this.nLineFirstBar == null || nLineIndex + 1 >= this.nLineFirstBar.Length) return -1;
+            return this.nLineFirstBar[nLineIndex + 1];
+        }
+
+        /// <summary>How far before its beat 1 a bar line is drawn; 0 for no bar (the song's end).</summary>
+        private int nBarLineGapPx(int nBar)
+        {
+            if (this.nBarGapPx == null || nBar < 0 || nBar >= this.nBarGapPx.Length) return 0;
+            return this.nBarGapPx[nBar];
         }
 
         /// <summary>The five staff lines of one system between two x offsets from the gutter.</summary>
@@ -575,39 +612,18 @@ namespace DTXMania
         }
 
         /// <summary>
-        /// x of a moment in time on the line that starts at nOriginMs, strictly linear: where the
-        /// bar lines go, and where the staff ends.
+        /// x of a moment in time on a line: strictly linear in time, for notes, beat ticks and the
+        /// playhead alike, so the playhead moves at one speed and is on a note exactly when it is
+        /// due. The line's first bar line sits PAGE_LEFT_PAD after the gutter and its beat 1 that
+        /// bar's gap further on; bar lines are drawn their gap before their beat 1.
         /// </summary>
-        private int nPageX(double dbMs, long nOriginMs)
+        private int nPageX(double dbMs, int nLineIndex)
         {
-            return LABEL_GUTTER_W + PAGE_LEFT_PAD + (int)((dbMs - nOriginMs) * this.dbPxPerMs);
-        }
-
-        /// <summary>
-        /// x of a note (or the playhead) on that line: as engraved, not as timed. The bar the moment
-        /// falls in is mapped into the room between its two bar lines less a gap after the opening
-        /// one and a smaller one before the closing one, so beat 1 stands clear of the bar line and
-        /// nothing is ever drawn on or beyond a bar's lines. The playhead follows the same map, so
-        /// it skips the gap at every bar line instead of drifting from the notes.
-        /// </summary>
-        private int nPageNoteX(double dbMs, long nOriginMs)
-        {
-            if (this.nBarMs == null || this.nBarMs.Length == 0) return nPageX(dbMs, nOriginMs);
-            // the bar this moment belongs to: the last bar line at or before it
-            int b = this.nBarSearchHint;
-            if (b < 0 || b >= this.nBarMs.Length) b = 0;
-            while (b > 0 && dbMs < this.nBarMs[b]) b--;
-            while (b + 1 < this.nBarMs.Length && dbMs >= this.nBarMs[b + 1]) b++;
-            this.nBarSearchHint = b;
-            long nT0 = this.nBarMs[b];
-            long nT1 = nBarEndMs(b);
-            if (dbMs < nT0 || nT1 <= nT0) return nPageX(dbMs, nOriginMs);      // before the first bar line
-            int x0 = nPageX(nT0, nOriginMs);
-            int x1 = nPageX(nT1, nOriginMs);
-            int nRoom = x1 - x0;
-            int nPadL = Math.Min(PAGE_BAR_PAD_L, nRoom / 4);                    // a very narrow bar keeps its
-            int nPadR = Math.Min(PAGE_BAR_PAD_R, nRoom / 8);                    // proportions rather than its gaps
-            return x0 + nPadL + (int)((dbMs - nT0) * (nRoom - nPadL - nPadR) / (double)(nT1 - nT0));
+            if (this.nLineMs == null || this.nLineMs.Length == 0) return LABEL_GUTTER_W + PAGE_LEFT_PAD;
+            if (nLineIndex < 0) nLineIndex = 0;
+            if (nLineIndex >= this.nLineMs.Length) nLineIndex = this.nLineMs.Length - 1;
+            return LABEL_GUTTER_W + PAGE_LEFT_PAD + nBarLineGapPx(this.nLineFirstBar[nLineIndex])
+                   + (int)((dbMs - this.nLineMs[nLineIndex]) * this.dbPxPerMs);
         }
 
         /// <summary>
@@ -649,7 +665,7 @@ namespace DTXMania
 
             long nNow = CSoundManager.rcPerformanceTimer.nCurrentTime;
             int nLine = nLineAt(nNow);
-            this.nHeadX = nPageNoteX(nNow, nLineOriginMs(nLine));
+            this.nHeadX = nPageX(nNow, nLine);
 
             // The playhead alternates strictly: even lines play on the upper staff, odd lines on
             // the lower one, so it always goes upper, lower, upper, lower. The staff it is not on
@@ -730,8 +746,10 @@ namespace DTXMania
                 // The staff runs from the gutter to the line's closing bar line only, so where a
                 // line holds fewer bars the staff stops there and the rest of the row is empty:
                 // what is staff is a bar. It fades with the line it belongs to.
+                // the staff begins at the line's first bar line, not at the gutter: a stub of staff
+                // before it reads as a sliver of the previous bar
                 int nWidth = nLineStaffWidth(nShow);
-                tDrawPageStaffLines(nBottom, 0, nWidth, 235 * nAlpha / 255);
+                tDrawPageStaffLines(nBottom, PAGE_LEFT_PAD, nWidth, 235 * nAlpha / 255);
                 tDrawPageLine(nShow, nAlpha, true);
                 if (nWidth > 0 && nAlpha > 0) tDrawLaneLabels();   // no legend for a staff that is not there
             }
@@ -760,7 +778,7 @@ namespace DTXMania
             int nLast = (nLineIndex + 1 < this.nLineFirstBar.Length) ? this.nLineFirstBar[nLineIndex + 1] : this.nBarMs.Length;
             for (int b = nFirst; b <= nLast && b < this.nBarMs.Length; b++)
             {
-                int x = nPageX(this.nBarMs[b], nOrigin);
+                int x = nPageX(this.nBarMs[b], nLineIndex) - this.nBarGapPx[b];      // drawn before its beat 1
                 if (x > nRight) break;
                 if (bDrawGrid) tDrawCell(SHAPE_SOLID, C_WHITE, x - 1, nStaffTop, 2, nStaffH, 230);
                 if (b == nLast) break;                      // the next line's first bar closes this one
@@ -783,7 +801,7 @@ namespace DTXMania
                 if (i0 < 0) i0 = ~i0;
                 for (int i = i0; i < this.nBeatMs.Length && this.nBeatMs[i] < nEndMs; i++)
                 {
-                    int xq = nPageNoteX(this.nBeatMs[i], nOrigin);
+                    int xq = nPageX(this.nBeatMs[i], nLineIndex);
                     if (xq > nRight) break;
                     tDrawCell(SHAPE_SOLID, C_WHITE, xq, nStaffTop, 1, nStaffH, 70);
                 }
@@ -804,7 +822,7 @@ namespace DTXMania
                 if (!mapNotes.TryGetValue(chip.nChannelNumber, out note)) continue;
                 if (bAlreadyOnThisBeat(chip.nPlaybackPosition, note.nPos)) continue;
 
-                int x = nPageNoteX(chip.nPlaybackTimeMs, nOrigin);
+                int x = nPageX(chip.nPlaybackTimeMs, nLineIndex);
                 if (x > nRight) break;
 
                 STPendingNote pending;
@@ -864,7 +882,7 @@ namespace DTXMania
                 int nGlowW = nSc(LANE_GLOW_W);
                 // scroll mode lights the whole played region; on a page that would be most of the
                 // line, so it is a short trail behind the playhead instead
-                int nFlashLeft = bPage ? Math.Max(LABEL_GUTTER_W, nHeadX - PAGE_FLASH_W) : LABEL_GUTTER_W;
+                int nFlashLeft = bPage ? Math.Max(LABEL_GUTTER_W + PAGE_LEFT_PAD, nHeadX - PAGE_FLASH_W) : LABEL_GUTTER_W;
                 tDrawCell(SHAPE_SOLID, nColour, nFlashLeft, y - nStep,
                           nHeadX - nFlashLeft, nSpace, (int)(LANE_FLASH_ALPHA * dbFade));
                 tDrawCell(SHAPE_HEAD, nColour, nHeadX - nGlowW / 2, y - nGlowW / 2,
