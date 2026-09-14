@@ -9,6 +9,14 @@ Builds are produced by GitHub Actions (`.github/workflows/build.yml`, Release x8
 extracting the zip over an existing DTXManiaNX folder; `Config.ini` is not included, so key
 bindings and settings are kept.
 
+## 1.5.0-beta.15 — 2026-09-14
+
+- Page mode: the staff of a line now begins at its first bar line instead of at the label gutter.
+  The short stub of staff before the first bar line looked like a sliver of the previous bar.
+- Page mode: the gap after a bar line to a note on beat 1 is 34 px (about a staff space plus a
+  note head, as engraved) instead of 14, and the gap before a closing bar line 10 px instead of 6.
+  The playhead's hop at each bar line grows with it.
+
 ## 1.5.0-beta.14 — 2026-09-14
 
 - Page mode: notes are placed as engraved, not as timed. Beat 1 no longer sits on the bar line:

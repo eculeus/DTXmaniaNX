@@ -97,9 +97,10 @@ namespace DTXMania
                                                                     // playhead here, not the whole played line
         public const int PAGE_LEFT_PAD = 24;                        // px between the gutter and a line's first bar
                                                                     // line, so the first note's head is not clipped
-        public const int PAGE_BAR_PAD_L = 14;                       // engraving gap after a bar line before the
-                                                                    // first beat, and ...
-        public const int PAGE_BAR_PAD_R = 6;                        // ... before the closing bar line: no note
+        public const int PAGE_BAR_PAD_L = 34;                       // engraving gap after a bar line to the centre
+                                                                    // of a note on beat 1 (about a staff space
+                                                                    // plus a note head), and ...
+        public const int PAGE_BAR_PAD_R = 10;                       // ... before the closing bar line: no note
                                                                     // ever sits on, or outside, its bar lines
         public const int PAGE_SWAP_LEAD_MS = 300;                   // a staff has finished fading its next line in
                                                                     // at least this long before that line is played
@@ -730,8 +731,10 @@ namespace DTXMania
                 // The staff runs from the gutter to the line's closing bar line only, so where a
                 // line holds fewer bars the staff stops there and the rest of the row is empty:
                 // what is staff is a bar. It fades with the line it belongs to.
+                // the staff begins at the line's first bar line, not at the gutter: a stub of staff
+                // before it reads as a sliver of the previous bar
                 int nWidth = nLineStaffWidth(nShow);
-                tDrawPageStaffLines(nBottom, 0, nWidth, 235 * nAlpha / 255);
+                tDrawPageStaffLines(nBottom, PAGE_LEFT_PAD, nWidth, 235 * nAlpha / 255);
                 tDrawPageLine(nShow, nAlpha, true);
                 if (nWidth > 0 && nAlpha > 0) tDrawLaneLabels();   // no legend for a staff that is not there
             }
@@ -864,7 +867,7 @@ namespace DTXMania
                 int nGlowW = nSc(LANE_GLOW_W);
                 // scroll mode lights the whole played region; on a page that would be most of the
                 // line, so it is a short trail behind the playhead instead
-                int nFlashLeft = bPage ? Math.Max(LABEL_GUTTER_W, nHeadX - PAGE_FLASH_W) : LABEL_GUTTER_W;
+                int nFlashLeft = bPage ? Math.Max(LABEL_GUTTER_W + PAGE_LEFT_PAD, nHeadX - PAGE_FLASH_W) : LABEL_GUTTER_W;
                 tDrawCell(SHAPE_SOLID, nColour, nFlashLeft, y - nStep,
                           nHeadX - nFlashLeft, nSpace, (int)(LANE_FLASH_ALPHA * dbFade));
                 tDrawCell(SHAPE_HEAD, nColour, nHeadX - nGlowW / 2, y - nGlowW / 2,
