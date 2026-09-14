@@ -9,6 +9,21 @@ Builds are produced by GitHub Actions (`.github/workflows/build.yml`, Release x8
 extracting the zip over an existing DTXManiaNX folder; `Config.ini` is not included, so key
 bindings and settings are kept.
 
+## 1.5.0-beta.13 — 2026-09-13
+
+- Page mode: every bar is drawn on exactly one staff. The pre-roll is gone: a line's notes ran on
+  into the start of the next line so the playhead could leave early, which meant a note you had
+  just played was also sitting, already passed, at the start of the line you were entering. The
+  playhead now stays on a line right up to its closing bar line and jumps to the first bar line
+  of the next one. `DrumsNotationPrerollMs` is no longer read.
+- Page mode: the playhead strictly alternates upper, lower, upper, lower. The staff it leaves
+  keeps its line for the first half of the first bar of the line now playing, fades it out over
+  half a bar, then fades the line after next in over half a bar, and is done at least 300 ms
+  before that line is due. A short line squeezes the schedule; one shorter than that swaps at
+  once. The old 300 ms crossfade on the moment of the jump is gone.
+- Page mode: lines still hold whole bars only, packed by where each bar ends, and the staff of a
+  line ends at its last bar.
+
 ## 1.5.0-beta.12 — 2026-09-13
 
 - Page mode: the staff lines of a line now stop at its closing bar line. A line that holds fewer
