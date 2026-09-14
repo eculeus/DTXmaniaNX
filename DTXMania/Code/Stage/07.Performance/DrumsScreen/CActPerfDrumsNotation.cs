@@ -95,10 +95,10 @@ namespace DTXMania
         public const int PAGE_RIGHT_MARGIN = 10;
         public const int PAGE_FLASH_W = 160;                        // the hit flash is a short trail behind the
                                                                     // playhead here, not the whole played line
-        public const int PAGE_PREROLL_MS = 600;                     // run-in before a line's first bar line, so
-                                                                    // the playhead arrives before the first note
-        public const int PAGE_SWAP_FADE_MS = 300;                   // a staff crossfades to its next line over
-                                                                    // this long when the playhead leaves it
+        public const int PAGE_LEFT_PAD = 24;                        // px between the gutter and a line's first bar
+                                                                    // line, so the first note's head is not clipped
+        public const int PAGE_SWAP_LEAD_MS = 300;                   // a staff has finished fading its next line in
+                                                                    // at least this long before that line is played
 
         public const int JUDGE_X = PLAYHEAD_X;                      // judgement popup anchor in scroll mode
         public const int JUDGE_GAP = 12;                            // its right edge sits this far left of the
@@ -207,13 +207,17 @@ namespace DTXMania
         private int[] nLineMs;                      // the time each staff line starts at ...
         private int[] nLineFirstBar;                // ... and its first bar's index in nBarMs
         private double dbPxPerMs;                   // one scale for the whole song, so the playhead is linear
-        private int nPrerollMs, nPrerollPx, nSongEndMs;
+        private int nSongEndMs;
         private int nBarSearchHint, nLineSearchHint;
 
-        // Which line each staff is showing, the one it is fading out of, and when that started.
+        // What each staff shows, and the swap it has been given: the line it will show next and the
+        // schedule for getting there (hold, fade the old line out until mid, fade the new one in
+        // until end). nSystemNextLine < 0 means no swap is pending.
         private readonly int[] nSystemLine = new int[] { -1, -1 };
-        private readonly int[] nSystemOldLine = new int[] { -1, -1 };
-        private readonly long[] nSystemFadeMs = new long[] { 0, 0 };
+        private readonly int[] nSystemNextLine = new int[] { -1, -1 };
+        private readonly long[] nSwapStartMs = new long[] { 0, 0 };
+        private readonly long[] nSwapMidMs = new long[] { 0, 0 };
+        private readonly long[] nSwapEndMs = new long[] { 0, 0 };
 
         /// <summary>One drum voice: where it sits on the staff, how it is drawn and in which lane colour.</summary>
         private struct STNote
@@ -442,15 +446,12 @@ namespace DTXMania
             this.nBeatMs = listBeatMs.ToArray();
             Array.Sort(this.nBeatMs);
             this.nPageLastLine = -1;
-            for (int k = 0; k < 2; k++) { this.nSystemLine[k] = -1; this.nSystemOldLine[k] = -1; }
+            for (int k = 0; k < 2; k++) { this.nSystemLine[k] = -1; this.nSystemNextLine[k] = -1; }
             this.nBarSearchHint = 0;
             this.nLineSearchHint = 0;
 
             int nBarsWanted = CDTXMania.ConfigIni.nDrumsNotationBarsPerLine;
             if (nBarsWanted < 1 || nBarsWanted > 8) nBarsWanted = 4;
-            int nPreroll = CDTXMania.ConfigIni.nDrumsNotationPrerollMs;
-            if (nPreroll < 0 || nPreroll > 3000) nPreroll = PAGE_PREROLL_MS;
-            this.nPrerollMs = nPreroll;
 
             // the last bar runs to the last chip, so it has a width like any other
             this.nSongEndMs = (this.nBarMs.Length > 0) ? Math.Max(nLastChipMs + 1, this.nBarMs[this.nBarMs.Length - 1] + 1) : 1;
@@ -464,10 +465,8 @@ namespace DTXMania
                                  / (this.nBarMs.Length - 1 - nFirstCounted);
             if (dbAverageBarMs < 100.0) dbAverageBarMs = 100.0;
 
-            int nUsable = 1280 - LABEL_GUTTER_W - PAGE_RIGHT_MARGIN;
-            this.dbPxPerMs = nUsable / (nBarsWanted * dbAverageBarMs + this.nPrerollMs);
-            this.nPrerollPx = (int)(this.nPrerollMs * this.dbPxPerMs);
-            int nBarRoom = nUsable - this.nPrerollPx;       // what is left for the bars themselves
+            int nBarRoom = 1280 - LABEL_GUTTER_W - PAGE_LEFT_PAD - PAGE_RIGHT_MARGIN;   // room for the bars
+            this.dbPxPerMs = nBarRoom / (nBarsWanted * dbAverageBarMs);
 
             // greedy packing: whole bars, as many as fit; one that cannot fit at all gets its own line
             List<int> listLineMs = new List<int>(64);
@@ -500,8 +499,8 @@ namespace DTXMania
 
             // the layout in the log, so a photo of a wrong page can be checked against the numbers
             System.Text.StringBuilder sb = new System.Text.StringBuilder(512);
-            sb.AppendFormat("Notation page: {0} bars, {1} beat lines, {2} lines, {3:F4} px/ms, pre-roll {4} ms, song end {5} ms; bars:",
-                            this.nBarMs.Length, this.nBeatMs.Length, this.nLineMs.Length, this.dbPxPerMs, this.nPrerollMs, this.nSongEndMs);
+            sb.AppendFormat("Notation page: {0} bars, {1} beat lines, {2} lines, {3:F4} px/ms, song end {4} ms; bars:",
+                            this.nBarMs.Length, this.nBeatMs.Length, this.nLineMs.Length, this.dbPxPerMs, this.nSongEndMs);
             for (int b = 0; b < this.nBarMs.Length && b < 40; b++)
                 sb.AppendFormat(" {0}@{1}", this.nBarNumber[b], this.nBarMs[b]);
             sb.Append("; lines:");
@@ -546,31 +545,67 @@ namespace DTXMania
             return (nBar + 1 < this.nBarMs.Length) ? this.nBarMs[nBar + 1] : this.nSongEndMs;
         }
 
-        /// <summary>Which line is on screen: a line owns the time from its own pre-roll to the next line's.</summary>
+        /// <summary>
+        /// Which line the playhead is on: a line owns the time from its first bar line up to the
+        /// next line's first bar line, so the playhead stays on a line right up to its closing bar
+        /// line and then jumps to the start of the next one. Nothing overlaps.
+        /// </summary>
         private int nLineAt(long nNowMs)
         {
             if (this.nLineMs == null || this.nLineMs.Length == 0) return 0;
             int n = this.nLineSearchHint;
             if (n < 0 || n >= this.nLineMs.Length) n = 0;
-            while (n > 0 && nNowMs < this.nLineMs[n] - this.nPrerollMs) n--;
-            while (n < this.nLineMs.Length - 1 && nNowMs >= this.nLineMs[n + 1] - this.nPrerollMs) n++;
+            while (n > 0 && nNowMs < this.nLineMs[n]) n--;
+            while (n < this.nLineMs.Length - 1 && nNowMs >= this.nLineMs[n + 1]) n++;
             this.nLineSearchHint = n;
             return n;
         }
 
-        /// <summary>Where a line begins on the clock: its first bar line, less the pre-roll run-in.</summary>
+        /// <summary>Where a line begins on the clock: its first bar line.</summary>
         private long nLineOriginMs(int nLineIndex)
         {
-            if (this.nLineMs == null || this.nLineMs.Length == 0) return -this.nPrerollMs;
+            if (this.nLineMs == null || this.nLineMs.Length == 0) return 0;
             if (nLineIndex < 0) nLineIndex = 0;
             if (nLineIndex >= this.nLineMs.Length) nLineIndex = this.nLineMs.Length - 1;
-            return this.nLineMs[nLineIndex] - this.nPrerollMs;
+            return this.nLineMs[nLineIndex];
         }
 
         /// <summary>x of a moment in time on the line that starts at nOriginMs. Strictly linear.</summary>
         private int nPageX(double dbMs, long nOriginMs)
         {
-            return LABEL_GUTTER_W + (int)((dbMs - nOriginMs) * this.dbPxPerMs);
+            return LABEL_GUTTER_W + PAGE_LEFT_PAD + (int)((dbMs - nOriginMs) * this.dbPxPerMs);
+        }
+
+        /// <summary>
+        /// Give a staff its next line, timed against the line the playhead is on now (nLine): the
+        /// old line stays for the first half of that line's first bar, fades out over half a bar,
+        /// then the new one fades in over half a bar - about a bar of change in all - and it is
+        /// all over PAGE_SWAP_LEAD_MS before the new line has to be played. A line too short for
+        /// that squeezes the schedule; one shorter than the lead swaps at once.
+        /// </summary>
+        private void tScheduleSwap(int k, int nNextLine, int nLine)
+        {
+            long nT0 = this.nLineMs[nLine];
+            long nBar = nBarEndMs(this.nLineFirstBar[nLine]) - nT0;
+            if (nBar <= 0) nBar = 1000;
+            long nDeadline = nLineEndMs(nLine) - PAGE_SWAP_LEAD_MS;
+            long nStart = nT0 + nBar / 2;
+            long nEnd = nStart + nBar;
+            if (nEnd > nDeadline)
+            {
+                nEnd = nDeadline;
+                nStart = Math.Max(nT0, nEnd - nBar);
+            }
+            if (nEnd <= nStart)
+            {
+                this.nSystemLine[k] = nNextLine;        // no room to fade at all
+                this.nSystemNextLine[k] = -1;
+                return;
+            }
+            this.nSystemNextLine[k] = nNextLine;
+            this.nSwapStartMs[k] = nStart;
+            this.nSwapMidMs[k] = (nStart + nEnd) / 2;
+            this.nSwapEndMs[k] = nEnd;
         }
 
         /// <summary>The whole page: band, two systems, their bars and notes, the legend and the playhead.</summary>
@@ -582,24 +617,39 @@ namespace DTXMania
             int nLine = nLineAt(nNow);
             this.nHeadX = nPageX(nNow, nLineOriginMs(nLine));
 
-            // The playhead alternates: even lines play on the upper staff, odd lines on the lower
-            // one. The staff it is not on always holds the line that comes next, so the page never
-            // shifts vertically - only the staff the playhead just left changes its content.
+            // The playhead alternates strictly: even lines play on the upper staff, odd lines on
+            // the lower one, so it always goes upper, lower, upper, lower. The staff it is not on
+            // holds the line that comes next; when the playhead moves on, the staff it just left
+            // keeps its line for a moment, then fades it out and the line after next in, all before
+            // that line is due. Nothing else ever changes, and no bar is drawn on more than one staff.
             int nPlaying = nLine & 1;
-            for (int k = 0; k < 2; k++)
+            int nIdle = 1 - nPlaying;
+            if (this.nSystemLine[nPlaying] != nLine || this.nSystemNextLine[nPlaying] >= 0)
             {
-                int nWanted = (k == nPlaying) ? nLine : nLine + 1;
-                if (this.nSystemLine[k] != nWanted)
+                // the staff being played must show its line, complete, now: this is a snap (song
+                // start or a skip), never a fade
+                System.Diagnostics.Trace.TraceInformation("Notation page: t={0} line {1}->{2}: staff {3} snaps {4}->{5}{6}",
+                    nNow, this.nPageLastLine, nLine, nPlaying, this.nSystemLine[nPlaying], nLine,
+                    (this.nPageLastLine >= 0 && nLine == this.nPageLastLine + 1 && this.nSystemLine[nPlaying] != nLine)
+                        ? " (UNEXPECTED: the staff being entered did not hold its line)" : "");
+                this.nSystemLine[nPlaying] = nLine;
+                this.nSystemNextLine[nPlaying] = -1;
+            }
+            if (this.nSystemLine[nIdle] != nLine + 1 && this.nSystemNextLine[nIdle] != nLine + 1)
+            {
+                if (this.nPageLastLine >= 0 && nLine == this.nPageLastLine + 1 && this.nSystemLine[nIdle] == nLine - 1)
                 {
-                    // Only the staff the playhead just left should ever change while the song runs
-                    // straight through; the other one already holds the line being entered. Logged
-                    // so a report of the idle staff changing can be checked against the timeline.
-                    System.Diagnostics.Trace.TraceInformation("Notation page: t={0} line {1}->{2}: staff {3} {4}->{5}{6}",
-                        nNow, this.nPageLastLine, nLine, k, this.nSystemLine[k], nWanted,
-                        (k == nPlaying && this.nPageLastLine >= 0 && nLine == this.nPageLastLine + 1) ? " (UNEXPECTED: the staff being entered changed)" : "");
-                    this.nSystemOldLine[k] = this.nSystemLine[k];
-                    this.nSystemLine[k] = nWanted;
-                    this.nSystemFadeMs[k] = nNow;
+                    tScheduleSwap(nIdle, nLine + 1, nLine);      // the playhead just left it: hold, then fade
+                    System.Diagnostics.Trace.TraceInformation("Notation page: t={0} line {1}->{2}: staff {3} {4}->{5} scheduled, out {6}-{7}, in {7}-{8}",
+                        nNow, this.nPageLastLine, nLine, nIdle, this.nSystemLine[nIdle], nLine + 1,
+                        this.nSwapStartMs[nIdle], this.nSwapMidMs[nIdle], this.nSwapEndMs[nIdle]);
+                }
+                else
+                {
+                    System.Diagnostics.Trace.TraceInformation("Notation page: t={0} line {1}->{2}: staff {3} snaps {4}->{5}",
+                        nNow, this.nPageLastLine, nLine, nIdle, this.nSystemLine[nIdle], nLine + 1);
+                    this.nSystemLine[nIdle] = nLine + 1;         // song start, or a skip
+                    this.nSystemNextLine[nIdle] = -1;
                 }
             }
             this.nPageLastLine = nLine;
@@ -618,25 +668,38 @@ namespace DTXMania
                 tSetSystem(nBottom, PAGE_SPACE, nBottom + PAGE_STEM_TOP_DY, nBottom + PAGE_STEM_BOTTOM_DY);
                 if (k == nPlaying) tDrawLaneFlashes();      // the flash belongs to the line being played
 
-                long nSince = nNow - this.nSystemFadeMs[k];
-                int nFade = (nSince >= PAGE_SWAP_FADE_MS || this.nSystemOldLine[k] < 0)
-                            ? 255 : (int)(255L * nSince / PAGE_SWAP_FADE_MS);
+                // which line this staff shows right now, and how strongly: a pending swap holds the
+                // old line, fades it out to nothing at the midpoint, then fades the new one in
+                int nShow = this.nSystemLine[k];
+                int nAlpha = 255;
+                if (this.nSystemNextLine[k] >= 0)
+                {
+                    if (nNow >= this.nSwapEndMs[k])
+                    {
+                        this.nSystemLine[k] = this.nSystemNextLine[k];
+                        this.nSystemNextLine[k] = -1;
+                        nShow = this.nSystemLine[k];
+                    }
+                    else if (nNow >= this.nSwapMidMs[k])
+                    {
+                        nShow = this.nSystemNextLine[k];
+                        nAlpha = (int)(255L * (nNow - this.nSwapMidMs[k]) / Math.Max(1L, this.nSwapEndMs[k] - this.nSwapMidMs[k]));
+                    }
+                    else if (nNow >= this.nSwapStartMs[k])
+                    {
+                        nAlpha = (int)(255L * (this.nSwapMidMs[k] - nNow) / Math.Max(1L, this.nSwapMidMs[k] - this.nSwapStartMs[k]));
+                    }
+                }
+                if (nAlpha > 255) nAlpha = 255;
+                if (nAlpha < 0) nAlpha = 0;
 
                 // The staff runs from the gutter to the line's closing bar line only, so where a
-                // line holds fewer bars the staff stops there and the rest of the row is empty: what
-                // is staff is a bar. During the crossfade the part both lines share stays solid and
-                // only the difference in length fades with the line it belongs to.
-                int nNewW = nLineStaffWidth(this.nSystemLine[k]);
-                int nOldW = (nFade < 255) ? nLineStaffWidth(this.nSystemOldLine[k]) : nNewW;
-                int nCommonW = Math.Min(nNewW, nOldW);
-                tDrawPageStaffLines(nBottom, 0, nCommonW, 235);
-                if (nNewW > nCommonW) tDrawPageStaffLines(nBottom, nCommonW, nNewW, 235 * nFade / 255);
-                else if (nOldW > nCommonW) tDrawPageStaffLines(nBottom, nCommonW, nOldW, 235 * (255 - nFade) / 255);
-
-                if (nFade < 255)
-                    tDrawPageLine(this.nSystemOldLine[k], 255 - nFade, false);
-                tDrawPageLine(this.nSystemLine[k], nFade, true);
-                if (nNewW > 0 || nOldW > 0) tDrawLaneLabels();     // no legend for a staff that is not there
+                // line holds fewer bars the staff stops there and the rest of the row is empty:
+                // what is staff is a bar. It fades with the line it belongs to.
+                int nWidth = nLineStaffWidth(nShow);
+                tDrawPageStaffLines(nBottom, 0, nWidth, 235 * nAlpha / 255);
+                tDrawPageLine(nShow, nAlpha, true);
+                if (nWidth > 0 && nAlpha > 0) tDrawLaneLabels();   // no legend for a staff that is not there
             }
 
             // the playhead sweeps whichever staff is being played
@@ -644,16 +707,16 @@ namespace DTXMania
                       PAGE_STEM_BOTTOM_DY - PAGE_STEM_TOP_DY + 12, 255);
         }
 
-        /// <summary>One staff line of the page: its pre-roll run-in, bars, beat ticks, numbers and notes.</summary>
+        /// <summary>One staff line of the page: its bars, beat ticks, numbers and notes.</summary>
         private void tDrawPageLine(int nLineIndex, int nAlphaScale, bool bDrawGrid)
         {
             if (nLineIndex < 0 || nAlphaScale <= 0) return;
             if (this.nLineMs == null || nLineIndex >= this.nLineMs.Length) return;
 
             long nOrigin = nLineOriginMs(nLineIndex);
-            // up to the next line's first bar line: the last pre-roll worth of notes therefore appears
-            // both at the end of this line and at the start of the next one, where they are hit
-            long nEndMs = (nLineIndex + 1 < this.nLineMs.Length) ? this.nLineMs[nLineIndex + 1] : this.nSongEndMs;
+            // from this line's first bar line up to (not including) the next line's: every note of
+            // the song is drawn on exactly one line
+            long nEndMs = nLineEndMs(nLineIndex);
             int nStaffH = 4 * this.nSpace + 1;
             int nStaffTop = this.nBaseY - 4 * this.nSpace;
             int nRight = 1280 - PAGE_RIGHT_MARGIN;
@@ -679,7 +742,7 @@ namespace DTXMania
             // Beat ticks come from the engine's own beat-line chips. Chip positions are always 384
             // per bar whatever the bar's length, so they cannot tell a 1-beat pickup from a 4/4 bar;
             // the loader's beat lines are placed with the bar length applied, so a pickup gets none
-            // and a 3/4 bar gets two. Only the line's own bars get ticks, not the pre-roll run-in.
+            // and a 3/4 bar gets two.
             if (bDrawGrid && this.nBeatMs != null && this.nBeatMs.Length > 0)
             {
                 int i0 = Array.BinarySearch(this.nBeatMs, (int)this.nLineMs[nLineIndex]);
@@ -694,8 +757,7 @@ namespace DTXMania
             #endregion
 
             // the page is laid out on the clock, so the chips come straight from the chart, not from
-            // the engine's time-based feed. The window starts at the pre-roll, so the tail of the
-            // previous line's last bar is shown again here, where the player will actually hit it.
+            // the engine's time-based feed
             this.listNotes.Clear();
             List<CChip> listChip = (CDTXMania.DTX != null) ? CDTXMania.DTX.listChip : null;
             if (listChip == null) return;
