@@ -15,7 +15,12 @@ bindings and settings are kept.
   The short stub of staff before the first bar line looked like a sliver of the previous bar.
 - Page mode: the gap after a bar line to a note on beat 1 is 34 px (about a staff space plus a
   note head, as engraved) instead of 14, and the gap before a closing bar line 10 px instead of 6.
-  The playhead's hop at each bar line grows with it.
+- Page mode: the playhead no longer teleports across the gap at a bar line, which made the
+  downbeat feel late (the eye expects it to keep moving at the same speed). Over the last 120 ms
+  of a bar it sweeps from the last note position across the gap and lands on the next bar's
+  beat-1 note exactly on the beat. Judgement timing was never affected; only the playhead was.
+  A note within those last 120 ms (a 32nd before a downbeat) is squeezed against the closing bar
+  line.
 
 ## 1.5.0-beta.14 — 2026-09-14
 
