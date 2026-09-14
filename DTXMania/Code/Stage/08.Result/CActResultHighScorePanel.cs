@@ -151,7 +151,8 @@ namespace DTXMania
 
 							this.t左寄せで描画する( graphics, this.prvf行, string.Format( CultureInfo.InvariantCulture, "{0,2}", i + 1 ), 10, y, color );
 							this.t左寄せで描画する( graphics, this.prvf行, entry.strName, 46, y, color );
-							this.t右寄せで描画する( graphics, this.prvf行, entry.nScore.ToString( CultureInfo.InvariantCulture ), 310, y, color );
+							this.t右寄せで描画する( graphics, this.prvf行, entry.nScore.ToString( CultureInfo.InvariantCulture ), 280, y, color );
+							this.t左寄せで描画する( graphics, this.prvf行, CHighScores.strRankLetter( entry.nRankValue ), 292, y, color );
 							this.t右寄せで描画する( graphics, this.prvf行, entry.dbAchievement.ToString( "0.00", CultureInfo.InvariantCulture ) + "%", n表の幅 - 10, y, color );
 						}
 					}
