@@ -9,6 +9,15 @@ Builds are produced by GitHub Actions (`.github/workflows/build.yml`, Release x8
 extracting the zip over an existing DTXManiaNX folder; `Config.ini` is not included, so key
 bindings and settings are kept.
 
+## 1.5.0-beta.16 — 2026-09-14
+
+- Page mode: the playhead no longer runs past a line's closing bar line. Since the bar lines
+  moved back before beat 1, the playhead now moves to the next line the moment it reaches the
+  closing bar line, appears at that line's first bar line, and travels the gap to beat 1 on time.
+  No note can fall in that gap.
+- High score lists (song select and result screen) show the letter grade (SS, S, A ... E) of each
+  run between the score and the achievement rate.
+
 ## 1.5.0-beta.15 — 2026-09-14
 
 - Page mode: bar lines are drawn 34 px before their beat 1 (about a staff space plus a note head,
