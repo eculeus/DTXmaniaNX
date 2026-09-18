@@ -385,6 +385,8 @@ namespace DTXMania
             this.bPAUSE = false;
             this.ctSkipDisplay = null;
 
+            this.tPracticeLoop_Setup();
+
             #region [ Sounds that should be registered in the mixer before starting playing (chip sounds that will be played immediately after the start of the performance) ]
             foreach (CChip pChip in listChip)
             {
@@ -889,6 +891,12 @@ namespace DTXMania
 
         protected long LoopBeginMs;
         protected long LoopEndMs;
+        /// <summary>選曲画面で選んだ練習区間(PRACTICE)でループしている間 true。演奏中に作る A/B ループとは区別する。</summary>
+        protected bool bPracticeLoopActive;
+        /// <summary>練習区間の名前。画面とログに出すだけ。</summary>
+        protected string strPracticeRangeName = "";
+        /// <summary>これより短い練習区間は使わない。ループにならず、ただ詰まるだけなので。</summary>
+        protected const int nPracticeLoopMinLengthMs = 500;
 
         //Generic video object
         private CDTX.CAVI caviGenericBackgroundVideo;
@@ -2421,20 +2429,28 @@ namespace DTXMania
                         CSoundManager.rcPerformanceTimer.tResume();
                         CDTXMania.Timer.tResume();
                     }
-                    base.ePhaseID = CStage.EPhase.演奏_STAGE_RESTART;
-                    this.eReturnValueAfterFadeOut = EPerfScreenReturnValue.Restart;
+                    if (this.bPracticeLoopActive)
+                    {
+                        // 練習中の再演奏キーは、曲の頭(= 読み込み画面からやり直し)ではなく区間の頭に戻すだけ。
+                        this.tPracticeLoop_Rewind();
+                    }
+                    else
+                    {
+                        base.ePhaseID = CStage.EPhase.演奏_STAGE_RESTART;
+                        this.eReturnValueAfterFadeOut = EPerfScreenReturnValue.Restart;
+                    }
                 }
                 else if (CDTXMania.Pad.bPressed(EKeyConfigPart.SYSTEM, EKeyConfigPad.SkipForward))
                 {
                     this.bIsTrainingMode = true;
                     Trace.TraceInformation("SKIP FORWARD CSoundManager.rcPerformanceTimer.nCurrentTime=" + CSoundManager.rcPerformanceTimer.nCurrentTime + ", CDTXMania.Timer.nCurrentTime=" + CDTXMania.Timer.nCurrentTime);
-                    this.tJumpInSong(CSoundManager.rcPerformanceTimer.nCurrentTime + CDTXMania.ConfigIni.nSkipTimeMs);
+                    this.tJumpInSong(this.nPracticeLoop_ClampSeek(CSoundManager.rcPerformanceTimer.nCurrentTime + CDTXMania.ConfigIni.nSkipTimeMs));
                 }
                 else if (CDTXMania.Pad.bPressed(EKeyConfigPart.SYSTEM, EKeyConfigPad.SkipBackward))
                 {
                     this.bIsTrainingMode = true;
                     Trace.TraceInformation("SKIP BACKWARD CSoundManager.rcPerformanceTimer.nCurrentTime=" + CSoundManager.rcPerformanceTimer.nCurrentTime + ", CDTXMania.Timer.nCurrentTime=" + CDTXMania.Timer.nCurrentTime);
-                    this.tJumpInSong(Math.Max(0, CSoundManager.rcPerformanceTimer.nCurrentTime - CDTXMania.ConfigIni.nSkipTimeMs));
+                    this.tJumpInSong(this.nPracticeLoop_ClampSeek(Math.Max(0, CSoundManager.rcPerformanceTimer.nCurrentTime - CDTXMania.ConfigIni.nSkipTimeMs)));
                 }
                 else if (!this.bPAUSE && CDTXMania.Pad.bPressed(EKeyConfigPart.SYSTEM, EKeyConfigPad.Skip))
                 {   // 演奏中のスキップ。飛ばした区間のチップはMISS扱いにするので、bIsTrainingModeは立てない(スコアは有効なまま)。
@@ -2472,6 +2488,8 @@ namespace DTXMania
                     Trace.TraceInformation("REMOVE LOOP CSoundManager.rcPerformanceTimer.nCurrentTime=" + CSoundManager.rcPerformanceTimer.nCurrentTime + ", CDTXMania.Timer.nCurrentTime=" + CDTXMania.Timer.nCurrentTime);
                     this.LoopBeginMs = -1;
                     this.LoopEndMs = -1;
+                    // 練習区間も解除する。以後は曲の最後まで普通に流れ、シークの制限も外れる。
+                    this.bPracticeLoopActive = false;
                 }
                 else if (CDTXMania.Pad.bPressed(EKeyConfigPart.SYSTEM, EKeyConfigPad.DecreasePlaySpeed))
                 {
@@ -5615,6 +5633,151 @@ namespace DTXMania
         }
 
         #endregion
+
+        #region [ 練習モード(PRACTICE)のループ ]
+        //-----------------
+
+        /// <summary>
+        /// <para>選曲画面で選ばれた練習区間を、この譜面の ms に直してループとして仕込む。</para>
+        /// <para>区間は小節番号で持っているので、ms への変換はここで一度だけ行う。以後は既存の
+        /// A/B ループ (LoopBeginMs / LoopEndMs) と同じ仕組みに乗るので、速度変更時の
+        /// 付け直し (tChangePlaySpeed) もそのまま効く。</para>
+        /// </summary>
+        protected void tPracticeLoop_Setup()
+        {
+            this.bPracticeLoopActive = false;
+            this.strPracticeRangeName = "";
+
+            CPracticeRange rRange = CDTXMania.rPracticeRange;
+            if (rRange == null || !CDTXMania.ConfigIni.bPracticeMode)
+                return;
+            if (CDTXMania.DTXVmode.Enabled || CDTXMania.DTX2WAVmode.Enabled)
+                return;      // DTX Viewer / WAV 出力中は触らない
+            if (CDTXMania.DTX == null || CDTXMania.DTX.listChip == null || CDTXMania.DTX.listChip.Count == 0)
+                return;
+
+            var timeMap = new CPracticeTimeMap(CDTXMania.DTX);
+            long nStartMs = timeMap.nTimeMsAt(rRange.stStart, rRange.nLeadBars);
+            long nEndMs = timeMap.nTimeMsAt(rRange.stEnd, 0);
+            long nSongEndMs = timeMap.nSongEndTimeMs;
+
+            // 範囲外や end <= start は捨てる。演奏をおかしくするより、普通に通しで演奏させたほうがよい。
+            if (nStartMs < 0)
+                nStartMs = 0;
+            if (nEndMs > nSongEndMs)
+                nEndMs = nSongEndMs;
+            if (nEndMs - nStartMs < nPracticeLoopMinLengthMs)
+            {
+                Trace.TraceWarning(
+                    "PRACTICE: range \"{0}\" [{1}] is not usable on this chart (start={2}ms end={3}ms, song ends at {4}ms). Playing the whole song.",
+                    rRange.strName, rRange.strRangeText, nStartMs, nEndMs, nSongEndMs);
+                return;
+            }
+
+            this.LoopBeginMs = nStartMs;
+            this.LoopEndMs = nEndMs;
+            this.bPracticeLoopActive = true;
+            this.strPracticeRangeName = rRange.strName;
+
+            // 記録は残さない。既存の「トレーニング扱い」に相乗りするので、score.ini も
+            // 名前つきハイスコア (scores.ini) もランクも、これ一つで全部止まる。
+            this.bIsTrainingMode = true;
+
+            Trace.TraceInformation(
+                "PRACTICE: loop \"{0}\" bars {1} -> {2} (lead {3}) = {4}ms -> {5}ms, {6}ms long. Scoring is off.",
+                rRange.strName, rRange.stStart.ToString(), rRange.stEnd.ToString(), rRange.nLeadBars,
+                nStartMs, nEndMs, nEndMs - nStartMs);
+        }
+
+        /// <summary>
+        /// 演奏が始まった直後(タイマをリセットした後)に呼ぶ。区間の頭まで飛ばす。
+        /// </summary>
+        protected void tPracticeLoop_OnPlayStart()
+        {
+            if (!this.bPracticeLoopActive || this.LoopBeginMs <= 0)
+                return;
+
+            Trace.TraceInformation("PRACTICE: starting at {0}ms.", this.LoopBeginMs);
+            this.tJumpInSong(this.LoopBeginMs);
+        }
+
+        /// <summary>
+        /// 区間の頭に巻き戻す。ループの折り返しと再演奏キーの両方から呼ばれる。
+        /// </summary>
+        protected void tPracticeLoop_Rewind()
+        {
+            long nTarget = (this.LoopBeginMs == -1) ? 0 : this.LoopBeginMs;
+            Trace.TraceInformation("PRACTICE: rewind to {0}ms.", nTarget);
+            this.tJumpInSong(nTarget);
+            this.tResetCountersForLoop();
+        }
+
+        /// <summary>
+        /// 練習中のシーク先を区間の中に収める。区間の外へ出たいときは LoopDelete でループを消す。
+        /// (終端へ丸めた場合は次のフレームでループ判定が拾って頭へ戻る)
+        /// </summary>
+        protected long nPracticeLoop_ClampSeek(long nPositionMs)
+        {
+            if (!this.bPracticeLoopActive)
+                return nPositionMs;
+
+            if ((this.LoopBeginMs != -1) && (nPositionMs < this.LoopBeginMs))
+                return this.LoopBeginMs;
+            if ((this.LoopEndMs != -1) && (nPositionMs > this.LoopEndMs))
+                return this.LoopEndMs;
+
+            return nPositionMs;
+        }
+
+        /// <summary>
+        /// <para>ループの終端まで来ていたら頭に戻す。演奏画面から毎フレーム、しかも
+        /// STAGE CLEAR の判定より先に呼ぶこと。区間の終わりが曲の終わりに近いと、
+        /// 先に全チップを通過して演奏終了になってしまうため。</para>
+        /// </summary>
+        protected void tCheckLoopWrap()
+        {
+            if ((this.LoopEndMs == -1) || (CSoundManager.rcPerformanceTimer.nCurrentTime <= this.LoopEndMs))
+                return;
+
+            Trace.TraceInformation("Reached end of loop");
+            this.tJumpInSong((this.LoopBeginMs == -1) ? 0 : this.LoopBeginMs);
+            this.tResetCountersForLoop();
+        }
+
+        /// <summary>
+        /// ループの頭に戻ったときにカウンタを畳む。表示されている数字がいま回っている
+        /// 一周ぶんだけを表すようにするため。(ゲージは練習中だけ初期値に戻す)
+        /// </summary>
+        protected void tResetCountersForLoop()
+        {
+            for (int i = 0; i < 3; i++)
+            {
+                this.nHitCount_ExclAuto[i].Perfect = 0;
+                this.nHitCount_ExclAuto[i].Great = 0;
+                this.nHitCount_ExclAuto[i].Good = 0;
+                this.nHitCount_ExclAuto[i].Poor = 0;
+                this.nHitCount_ExclAuto[i].Miss = 0;
+                this.nTimingHitCount[i].nLate = 0;
+                this.nTimingHitCount[i].nEarly = 0;
+                if (this.actCombo != null)
+                {
+                    // 最高COMBOを先に畳んでおくこと。現在値のsetterがステータスパネルに最高COMBOを書き戻すため。
+                    this.actCombo.nCurrentCombo.HighestValue[i] = 0;
+                    this.actCombo.nCurrentCombo[i] = 0;
+                }
+                if (this.actScore != null)
+                    this.actScore.nCurrentTrueScore[i] = 0;
+            }
+
+            // 練習では毎周ゲージも戻す。区間の頭から何度でも同じ条件で入り直せるように。
+            // (既存の演奏中 A/B ループの挙動は変えない)
+            if (this.bPracticeLoopActive && (this.actGauge != null))
+                this.actGauge.Init(CDTXMania.ConfigIni.nRisky);
+        }
+
+        //-----------------
+        #endregion
+
         public void tJumpInSongToBar(int nStartBar)
         {
             int nTopChip = 0;
@@ -5639,7 +5802,7 @@ namespace DTXMania
         protected void tSkipInPlay()
         {
             long nOldPosition = CSoundManager.rcPerformanceTimer.nCurrentTime;
-            long nNewPosition = nOldPosition + CDTXMania.ConfigIni.nSkipTimeMs;
+            long nNewPosition = this.nPracticeLoop_ClampSeek(nOldPosition + CDTXMania.ConfigIni.nSkipTimeMs);
 
             Trace.TraceInformation("SKIP IN PLAY CSoundManager.rcPerformanceTimer.nCurrentTime=" + nOldPosition + ", newPosition=" + nNewPosition);
 
