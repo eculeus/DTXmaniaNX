@@ -202,13 +202,13 @@ namespace DTXMania
 		{
 			int nRows = this.listRanges.Count + 2;		// OFF + 区間 + "New range..."
 
-			if( keyboard.bKeyPressed( (int) SlimDXKey.UpArrow ) )
+			if( bPressedUp( keyboard ) )
 			{
 				this.nCursor = ( this.nCursor + nRows - 1 ) % nRows;
 				CDTXMania.Skin.soundCursorMovement.tPlay();
 				this.bRedraw = true;
 			}
-			else if( keyboard.bKeyPressed( (int) SlimDXKey.DownArrow ) )
+			else if( bPressedDown( keyboard ) )
 			{
 				this.nCursor = ( this.nCursor + 1 ) % nRows;
 				CDTXMania.Skin.soundCursorMovement.tPlay();
@@ -231,7 +231,7 @@ namespace DTXMania
 					this.bRedraw = true;
 				}
 			}
-			else if( keyboard.bKeyPressed( (int) SlimDXKey.Return ) || keyboard.bKeyPressed( (int) SlimDXKey.NumberPadEnter ) )
+			else if( bPressedDecide( keyboard ) )
 			{
 				if( this.nCursor == 0 )
 				{
@@ -253,7 +253,7 @@ namespace DTXMania
 					this.tDeativatePopupMenu();
 				}
 			}
-			else if( keyboard.bKeyPressed( (int) SlimDXKey.Escape ) )
+			else if( bPressedCancel( keyboard ) )
 			{
 				CDTXMania.Skin.soundCancel.tPlay();
 				this.tDeativatePopupMenu();
@@ -275,14 +275,14 @@ namespace DTXMania
 		{
 			const int nEditRows = 5;		// START / END / LEAD / USE NOW / NAME & SAVE
 
-			if( keyboard.bKeyPressed( (int) SlimDXKey.Escape ) )
+			if( bPressedCancel( keyboard ) )
 			{
 				CDTXMania.Skin.soundCancel.tPlay();
 				this.ePhase = EPhase.List;
 				this.bRedraw = true;
 				return;
 			}
-			if( keyboard.bKeyPressed( (int) SlimDXKey.UpArrow ) )
+			if( bPressedUp( keyboard ) )
 			{
 				this.nEditCursor = ( this.nEditCursor + nEditRows - 1 ) % nEditRows;
 				this.strTypeBuffer = "";
@@ -290,7 +290,7 @@ namespace DTXMania
 				this.bRedraw = true;
 				return;
 			}
-			if( keyboard.bKeyPressed( (int) SlimDXKey.DownArrow ) )
+			if( bPressedDown( keyboard ) )
 			{
 				this.nEditCursor = ( this.nEditCursor + 1 ) % nEditRows;
 				this.strTypeBuffer = "";
@@ -340,7 +340,7 @@ namespace DTXMania
 				}
 			}
 
-			if( keyboard.bKeyPressed( (int) SlimDXKey.Return ) || keyboard.bKeyPressed( (int) SlimDXKey.NumberPadEnter ) )
+			if( bPressedDecide( keyboard ) )
 			{
 				if( !this.bEditingRangeIsValid() )
 				{
@@ -371,6 +371,8 @@ namespace DTXMania
 
 		private void tHandleKeyInput_EditName( IInputDevice keyboard )
 		{
+			// ここは文字入力なので、パッドは見ない。LC は既定で A と Z に割り当たっているので、
+			// パッドを見ると名前に A を打っただけで取り消しになってしまう。
 			if( keyboard.bKeyPressed( (int) SlimDXKey.Escape ) )
 			{
 				CDTXMania.Skin.soundCancel.tPlay();
@@ -418,6 +420,33 @@ namespace DTXMania
 					this.bRedraw = true;
 				}
 			}
+		}
+
+		// ポップアップメニューと同じ操作でパッドからも動かせるようにしておく。
+		private static bool bPressedUp( IInputDevice keyboard )
+		{
+			return keyboard.bKeyPressed( (int) SlimDXKey.UpArrow )
+				|| CDTXMania.Pad.bPressed( EInstrumentPart.DRUMS, EPad.HT )
+				|| CDTXMania.Pad.bPressedGB( EPad.R );
+		}
+		private static bool bPressedDown( IInputDevice keyboard )
+		{
+			return keyboard.bKeyPressed( (int) SlimDXKey.DownArrow )
+				|| CDTXMania.Pad.bPressed( EInstrumentPart.DRUMS, EPad.LT )
+				|| CDTXMania.Pad.bPressedGB( EPad.G );
+		}
+		private static bool bPressedDecide( IInputDevice keyboard )
+		{
+			return keyboard.bKeyPressed( (int) SlimDXKey.Return )
+				|| keyboard.bKeyPressed( (int) SlimDXKey.NumberPadEnter )
+				|| CDTXMania.Pad.bPressedDGB( EPad.Decide )
+				|| CDTXMania.Pad.bPressed( EInstrumentPart.DRUMS, EPad.RD );
+		}
+		private static bool bPressedCancel( IInputDevice keyboard )
+		{
+			return keyboard.bKeyPressed( (int) SlimDXKey.Escape )
+				|| CDTXMania.Pad.bPressed( EInstrumentPart.DRUMS, EPad.LC )
+				|| CDTXMania.Pad.bPressedGB( EPad.Cancel );
 		}
 
 		private static int nTypedDigit( IInputDevice keyboard )

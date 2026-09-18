@@ -385,8 +385,10 @@ Two ordering details that are easy to get wrong and are commented in the source:
 
 ### Known limits
 
-- The panel is keyboard-only (arrows, Enter, Escape, Delete, digits, A–Z). The drum pads
-  navigate song select but not this panel.
+- The panel takes the same pad input as the sort and quick-config popups (HT/LT or R/G to
+  move, Decide or RD to pick, LC or Cancel to back out) as well as the arrows, Enter, Escape
+  and Delete. Typing a range or a name is keyboard-only, and the name field ignores the pads
+  entirely — LC is bound to A and Z by default, so a pad would eat the letters.
 - Shift+F2 is a fixed key, not a bindable `[SystemKeyAssign]` entry. It reuses the slot the
   upstream source has kept free for "some other use in the future" since 2011.
 - Section names are drawn with the song-list font; non-Latin names should work but have not

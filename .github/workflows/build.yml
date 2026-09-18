@@ -499,11 +499,17 @@ jobs:
             '  [DllImport("user32.dll")] public static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtra);',
             '  [DllImport("user32.dll")] public static extern uint MapVirtualKey(uint uCode, uint uMapType);',
             '  [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);',
-            '  public static void Down(byte vk) { keybd_event(vk, (byte)MapVirtualKey(vk, 0), 0, UIntPtr.Zero); }',
-            '  public static void Up(byte vk)   { keybd_event(vk, (byte)MapVirtualKey(vk, 0), 2, UIntPtr.Zero); }',
-            '  public static void Tap(byte vk, int holdMs) { Down(vk); System.Threading.Thread.Sleep(holdMs); Up(vk); }',
+            '  // The arrow keys are EXTENDED keys. Without KEYEVENTF_EXTENDEDKEY (1) their scan code',
+            '  // is the num-pad one, and DirectInput - which is how DTXMania reads the keyboard -',
+            '  // sees DIK_NUMPAD2 instead of DIK_DOWN, so the press lands nowhere.',
+            '  public static void Down(byte vk, bool ext) { keybd_event(vk, (byte)MapVirtualKey(vk, 0), ext ? 1u : 0u, UIntPtr.Zero); }',
+            '  public static void Up(byte vk, bool ext)   { keybd_event(vk, (byte)MapVirtualKey(vk, 0), ext ? 3u : 2u, UIntPtr.Zero); }',
+            '  public static void Tap(byte vk, int holdMs) { TapEx(vk, holdMs, false); }',
+            '  public static void TapEx(byte vk, int holdMs, bool ext) {',
+            '    Down(vk, ext); System.Threading.Thread.Sleep(holdMs); Up(vk, ext);',
+            '  }',
             '  public static void TapShift(byte vk, int holdMs) {',
-            '    Down(0xA0); System.Threading.Thread.Sleep(60); Tap(vk, holdMs); System.Threading.Thread.Sleep(60); Up(0xA0);',
+            '    Down(0xA0, false); System.Threading.Thread.Sleep(60); Tap(vk, holdMs); System.Threading.Thread.Sleep(60); Up(0xA0, false);',
             '  }',
             '}'
           ) -join [Environment]::NewLine)
@@ -597,7 +603,7 @@ jobs:
 
             # Row 0 is "OFF"; one Down lands on the first section from sections.def ("Verse").
             Focus-Game
-            [Drive2]::Tap([byte]$VK_DOWN, 80)
+            [Drive2]::TapEx([byte]$VK_DOWN, 80, $true)
             Start-Sleep -Seconds 2
             Focus-Game
             Snap 'panel_verse'
