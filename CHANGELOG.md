@@ -34,6 +34,11 @@ bindings and settings are kept.
   moves it: bigger for more history, smaller for more lookahead. Out of range or not a number
   keeps the default. The chip lookahead, the judgement popup, the lane flash and the bar lines
   all follow the playhead. Page mode is unaffected - it does not use this position at all.
+- A played chip used to be dropped a flat 65 px past the judgement line, which in the notation
+  view is 52 px: with the old playhead that was already inside the legend gutter, but at any
+  playhead further right the note would have blinked out in mid-staff. In the notation view a
+  chip is now kept until it reaches the gutter, which is also why the stage now clears when the
+  last note has left the staff rather than a fifth of a second after it passed the playhead.
 
 - **Practice loop mode.** `Config > Drums > PracticeMode` (`PracticeMode=` in `[PlayOption]`,
   off by default). With it on, **Shift+F2** in song select opens a PRACTICE panel: pick a named

@@ -86,6 +86,27 @@ namespace DTXMania
             }
         }
 
+        public const int TRAIL_MARGIN_PX = 40;                      // a head is half a cell wide, so it is let go
+                                                                    // of a little after its centre reaches the gutter
+        public const int PAGE_TRAIL_PX = 65;                        // page mode reads the chart itself and does not
+                                                                    // care: it keeps the stock figure
+        /// <summary>
+        /// How far behind (in vertical-lane px) a chip that has been played has to get before the stage
+        /// may retire it and stop handing it to us. The mirror of LOOKAHEAD_PX: exactly the band left of
+        /// the playhead, so a judged head keeps its colour all the way to the legend gutter instead of
+        /// blinking out. The stock figure is a flat 65 lane px = 52 screen px here, which with the
+        /// playhead at its old x=150 fell inside the gutter and so cost nothing; the further right the
+        /// playhead sits the more of the played staff it would blank.
+        /// </summary>
+        public static int TRAIL_PX
+        {
+            get
+            {
+                if (bPage) return PAGE_TRAIL_PX;
+                return (int)((nPlayheadX - LABEL_GUTTER_W) / X_SCALE) + TRAIL_MARGIN_PX;
+            }
+        }
+
         // Where the rest of the drums HUD goes while the notation band owns the top 65% of the screen.
         // All of these are only used when ConfigIni.bDrumsNotationView is on.
         public const int PROGRESS_X = 0;                            // song progress bar, laid out horizontally
