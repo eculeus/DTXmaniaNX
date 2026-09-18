@@ -162,6 +162,7 @@
     <Compile Include="Code\03.Sound\CSoundDeviceDirectSound.cs" />
     <Compile Include="Code\03.Sound\CSoundDeviceNull.cs" />
     <Compile Include="Code\03.Sound\CSoundDeviceWASAPI.cs" />
+    <Compile Include="Code\03.Sound\CSoundPlaySpeedRouting.cs" />
     <Compile Include="Code\03.Sound\CSoundTimer.cs" />
     <Compile Include="Code\03.Sound\Cxa.cs" />
     <Compile Include="Code\03.Sound\ESoundDeviceType.cs" />
