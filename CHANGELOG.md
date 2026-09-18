@@ -11,6 +11,24 @@ bindings and settings are kept.
 
 ## 1.5.0-beta.17 — 2026-09-18
 
+- **Play speed works again with TimeStretch ON** (WASAPI/ASIO). Changing the speed used to swap
+  the mixer channel from the raw stream to the pitch-preserving tempo stream without ever taking
+  the raw one out, so both were mixed at once, both pulled on the same decoder, and the song ran
+  roughly twice as fast instead of slower — and putting the speed back to x1.000 never recovered
+  it. A sound that has a tempo stream now plays through that tempo stream for its whole life,
+  x1.000 included (tempo 0%), so the mixer channel never changes identity. Should a handle ever
+  change again, it is now removed from the mixer and re-added at the same position, volume and
+  pan, and the end-of-stream callback follows it.
+- With TimeStretch ON, a sound loaded before the setting was switched on has no tempo stream; its
+  play speed used to be set on an attribute that stream cannot honour, and was silently ignored.
+  It now falls back to changing the frequency, as with TimeStretch OFF.
+- With TimeStretch ON, the random detune on a bad hit no longer re-applies the play speed as a
+  pitch shift on top of the tempo change.
+- The play speed and detune are re-applied after a sound device change, instead of being lost
+  with the rebuilt streams.
+- The routing rules behind all of that are checked in CI by a small offline harness
+  (`Tests/TimeStretchRouting`) that needs no sound device.
+
 - Notation view: a note takes the colour of its judgement as it is played and keeps it while it
   is on screen, so the part of the staff already gone by reads as a report of how it went. The
   head eases from its lane colour over to Perfect ice blue, Great sea green, Good gold, Poor
