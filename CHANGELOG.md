@@ -13,10 +13,10 @@ bindings and settings are kept.
 
 - Notation view: a note takes the colour of its judgement as it is played and keeps it while it
   is on screen, so the part of the staff already gone by reads as a report of how it went. The
-  head eases from its lane colour over to Perfect ice blue, Great sea green, Good amber, Poor
+  head eases from its lane colour over to Perfect ice blue, Great sea green, Good gold, Poor
   violet or Miss red over 180 ms (cubic ease out, on the clock, so the fade is the same at any
   frame rate), and a missed head is boxed as well as reddened - the one cue that is not a colour.
-  A judged head is also drawn stronger than a plain played one (alpha 150, against 70 scrolling
+  A judged head is also drawn stronger than a plain played one (alpha 170, against 70 scrolling
   and 102 on the page) since its colour is the thing being read. Works in both scroll and page
   mode; the playhead, bar lines, beat ticks, legend and the rest of the HUD are untouched.
 - Notation view: the flash at the playhead takes the judgement's colour too, and a miss now

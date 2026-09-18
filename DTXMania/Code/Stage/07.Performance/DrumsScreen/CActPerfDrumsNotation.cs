@@ -153,7 +153,7 @@ namespace DTXMania
         // is until the line turns, which is the whole point: the played half of the staff reads as
         // a report of how it went. Auto-played lanes are not judged and keep their lane colour.
         private const int JUDGE_FADE_MS = 180;      // eased out, so the change is seen, not blinked
-        private const int JUDGE_ALPHA = 150;        // a judged head is drawn stronger than a plain
+        private const int JUDGE_ALPHA = 170;        // a judged head is drawn stronger than a plain
                                                     // played one (70 scrolling, 102 on the page):
                                                     // its colour is the thing being read
         private const int MISS_BOX_PAD = 7;         // a missed head is boxed as well as reddened, so
@@ -420,7 +420,10 @@ namespace DTXMania
             {
                 case EJudgement.Perfect: return Color.FromArgb(120, 245, 255);  // ice, the brightest
                 case EJudgement.Great:   return Color.FromArgb( 90, 225, 160);  // sea green
-                case EJudgement.Good:    return Color.FromArgb(245, 200,  70);  // amber
+                case EJudgement.Good:    return Color.FromArgb(255, 230, 115);  // light gold: the snare's
+                                                                                // own amber is 255,205,40,
+                                                                                // so a judged snare has to
+                                                                                // be lighter to read as one
                 case EJudgement.Poor:    return Color.FromArgb(200, 130, 255);  // violet
                 default:                 return Color.FromArgb(255,  70,  70);  // Miss and Bad: red
             }

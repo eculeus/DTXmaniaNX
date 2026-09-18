@@ -746,7 +746,7 @@ namespace DTXMania
                 "楽譜表示の音符が判定の色に\n" +
                 "変わります。\n" +
                 "(Perfect, Great, ...)",
-                "On the notation staff, a note fades from its lane colour to the colour of its judgement as it is played, and keeps it while it is on screen. Perfect is cyan, Great green, Good amber, Poor violet and Miss red and boxed. Auto-played notes keep their lane colour.");
+                "On the notation staff, a note fades from its lane colour to the colour of its judgement as it is played, and keeps it while it is on screen. Perfect is cyan, Great green, Good gold, Poor violet and Miss red and boxed. Auto-played notes keep their lane colour.");
             this.listItems.Add(this.iDrumsNotationJudge);
 
             this.iDrumsPosition = new CItemList("JudgePosition", CItemBase.EPanelType.Normal, (int)CDTXMania.ConfigIni.JudgementStringPosition.Drums,
