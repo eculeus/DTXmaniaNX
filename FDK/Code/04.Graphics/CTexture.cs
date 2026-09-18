@@ -35,6 +35,25 @@ namespace FDK
 			get;
 			set;
 		}
+		/// <summary>
+		/// 描画色を乗算する（白いテクスチャを任意の色で描ける）。
+		/// A diffuse tint the texture is modulated by, so one white sprite can be drawn in any
+		/// colour. White (the default) leaves the texture exactly as it is; alpha is nTransparency
+		/// as before.
+		/// </summary>
+		public void tSetTint( float fRed, float fGreen, float fBlue )
+		{
+			this.color4.Red = ( fRed < 0f ) ? 0f : ( ( fRed > 1f ) ? 1f : fRed );
+			this.color4.Green = ( fGreen < 0f ) ? 0f : ( ( fGreen > 1f ) ? 1f : fGreen );
+			this.color4.Blue = ( fBlue < 0f ) ? 0f : ( ( fBlue > 1f ) ? 1f : fBlue );
+		}
+		/// <summary>Back to no tint. Always call this once the tinted draws are done.</summary>
+		public void tClearTint()
+		{
+			this.color4.Red = 1f;
+			this.color4.Green = 1f;
+			this.color4.Blue = 1f;
+		}
 		public int nTransparency
 		{
 			get
