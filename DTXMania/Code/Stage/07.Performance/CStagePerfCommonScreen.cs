@@ -1448,6 +1448,11 @@ namespace DTXMania
                         // the vertical view's own hook only fires on a real pad hit
                         if (bNotationView && eJudgeResult != EJudgement.Miss)
                             this.tNotationLaneHit(pChip);
+                        // ...and the note itself takes the judgement's colour. A miss gets here too
+                        // (the chip is put through this method when it passes the bar unhit), which
+                        // is the whole point: the note that went by red is the one that was missed.
+                        if (bNotationView)
+                            this.tNotationJudge(pChip, bPChipIsAutoPlay ? EJudgement.Auto : eJudgeResult);
                     }
                     break;
 
@@ -4641,6 +4646,10 @@ namespace DTXMania
 
         /// <summary>Light this chip's lane on the notation staff. Only the drums screen does anything.</summary>
         protected virtual void tNotationLaneHit(CChip pChip) { }
+
+        /// <summary>Tell the notation staff how this chip was judged, so its notehead can take the
+        /// judgement's colour. Auto (an auto-played lane) leaves the note in its lane colour.</summary>
+        protected virtual void tNotationJudge(CChip pChip, EJudgement eJudge) { }
 
         /// <summary>How far ahead (in vertical-lane px) chips are fed to the drawing code. The
         /// notation view spreads them over a much smaller horizontal scale, so it needs more.</summary>

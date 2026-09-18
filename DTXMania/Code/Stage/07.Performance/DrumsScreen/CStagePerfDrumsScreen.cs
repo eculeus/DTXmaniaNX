@@ -3168,6 +3168,7 @@ namespace DTXMania
 		protected override bool bNotationView { get { return CDTXMania.ConfigIni.bDrumsNotationView; } }
 		protected override void tDrawNotationBeatLine( CChip pChip ) { this.actNotation.tDrawBeatLine( pChip ); }
 		protected override void tNotationLaneHit( CChip pChip ) { this.actNotation.tLaneHit( pChip.nChannelNumber ); }
+		protected override void tNotationJudge( CChip pChip, EJudgement eJudge ) { this.actNotation.tJudge( pChip, eJudge ); }
 
 		protected override void tUpdateAndDraw_Chip_Drums( CConfigIni configIni, ref CDTX dTX, ref CChip pChip )
 		{

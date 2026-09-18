@@ -130,6 +130,8 @@ namespace DTXMania
         private const int BEAM_GAP = 10;
         /// <summary>Stems and beams are off by default: most players read the heads faster without them.</summary>
         private static bool bStems { get { return CDTXMania.ConfigIni.bDrumsNotationStems; } }
+        /// <summary>Judgement colours are on by default; Config -> Drums -> NotationJudge turns them off.</summary>
+        private static bool bJudgeColour { get { return CDTXMania.ConfigIni.bDrumsNotationJudgeColour; } }
 
         // Lane legend down the left edge of the band: one column, one label per lane. At 36 px
         // spacing the lanes are 18 px apart, so a ~17 px glyph fits without stacking.
@@ -145,6 +147,18 @@ namespace DTXMania
         private const int LANE_FLASH_ALPHA = 120;
         private const int LANE_GLOW_ALPHA = 210;
         private const int LANE_GLOW_W = 40;
+
+        // Judgement colours: as a note is judged its head eases from the lane's hue over to the
+        // colour of the judgement, and keeps it for as long as it is on screen - on the page that
+        // is until the line turns, which is the whole point: the played half of the staff reads as
+        // a report of how it went. Auto-played lanes are not judged and keep their lane colour.
+        private const int JUDGE_FADE_MS = 180;      // eased out, so the change is seen, not blinked
+        private const int JUDGE_ALPHA = 170;        // a judged head is drawn stronger than a plain
+                                                    // played one (70 scrolling, 102 on the page):
+                                                    // its colour is the thing being read
+        private const int MISS_BOX_PAD = 7;         // a missed head is boxed as well as reddened, so
+        private const int MISS_BOX_H = 3;           // it is told apart without relying on colour; the
+                                                    // pad keeps the box off the head it is around
         private const int POS_MIN = -1;             // lowest staff position any voice uses (left pedal)
         private const int POS_MAX = 12;             // highest (left crash on its second ledger line)
 
@@ -284,6 +298,8 @@ namespace DTXMania
             public int nPlaybackPosition;
             public int nAlpha;
             public STNote note;
+            public int nJudge;      // the EJudgement this note was given, or -1 for the lane colour
+            public float fJudge;    // how far it has eased over to that judgement's colour, 0..1
         }
 
         private readonly List<STPendingNote> listNotes = new List<STPendingNote>(256);
@@ -292,7 +308,18 @@ namespace DTXMania
         private CPrivateFastFont pfLabel;
         // hit feedback, indexed by staff position + 1 so the left pedal (-1) fits
         private readonly CCounter[] ctLaneFlash = new CCounter[POS_MAX - POS_MIN + 1];
-        private readonly int[] nLaneFlashColour = new int[POS_MAX - POS_MIN + 1];
+        private readonly Color[] colLaneFlash = new Color[POS_MAX - POS_MIN + 1];
+
+        /// <summary>How a chip was judged and when, so the fade over to that colour is on the clock
+        /// rather than on frames.</summary>
+        private struct STJudge
+        {
+            public EJudgement eJudge;
+            public long nJudgedMs;
+        }
+        // Keyed by the chip itself: the scroll view is handed chips by the stage and the page view
+        // reads them straight out of the chart, and both are the very same CChip objects.
+        private readonly Dictionary<CChip, STJudge> dicJudge = new Dictionary<CChip, STJudge>(512);
 
         public CActPerfDrumsNotation()
         {
@@ -305,6 +332,7 @@ namespace DTXMania
             {
                 this.tx = CDTXMania.tGenerateTexture(CSkin.Path(@"Graphics\7_notation.png"));
                 this.nLineMs = null;            // rebuilt for this song on the first page-mode frame
+                this.dicJudge.Clear();          // judgements belong to the song that was playing
                 tCreateLaneLabels();
                 base.OnManagedCreateResources();
             }
@@ -377,6 +405,89 @@ namespace DTXMania
                 case C_RIDE:  return Color.FromArgb(168, 223, 255);
                 default:      return Color.White;
             }
+        }
+
+        /// <summary>
+        /// The colour a judged notehead ends up in. They are chosen to stay apart on the dark band
+        /// and for a player who cannot separate red from green: the good end is light and cool
+        /// (ice, then sea green), the middle is warm and yellow, the bad end is violet and red, so
+        /// hue, lightness and saturation all move together and no pair differs by hue alone. Miss
+        /// is boxed as well, which is the only cue that does not use colour at all.
+        /// </summary>
+        private static Color colJudge(EJudgement eJudge)
+        {
+            switch (eJudge)
+            {
+                case EJudgement.Perfect: return Color.FromArgb(120, 245, 255);  // ice, the brightest
+                case EJudgement.Great:   return Color.FromArgb( 90, 225, 160);  // sea green
+                case EJudgement.Good:    return Color.FromArgb(255, 230, 115);  // light gold: the snare's
+                                                                                // own amber is 255,205,40,
+                                                                                // so a judged snare has to
+                                                                                // be lighter to read as one
+                case EJudgement.Poor:    return Color.FromArgb(200, 130, 255);  // violet
+                default:                 return Color.FromArgb(255,  70,  70);  // Miss and Bad: red
+            }
+        }
+
+        /// <summary>A missed note is boxed as well as coloured, so colour is never the only cue.</summary>
+        private static bool bBoxedJudge(EJudgement eJudge)
+        {
+            return eJudge == EJudgement.Miss || eJudge == EJudgement.Bad;
+        }
+
+        /// <summary>Somewhere between two colours: f=0 is the lane's, f=1 the judgement's.</summary>
+        private static Color colBlend(Color colFrom, Color colTo, float f)
+        {
+            if (f <= 0f) return colFrom;
+            if (f >= 1f) return colTo;
+            return Color.FromArgb(colFrom.R + (int)((colTo.R - colFrom.R) * f),
+                                  colFrom.G + (int)((colTo.G - colFrom.G) * f),
+                                  colFrom.B + (int)((colTo.B - colFrom.B) * f));
+        }
+
+        /// <summary>
+        /// The stage has judged a chip. Its head eases from the lane colour over to the colour of
+        /// that judgement and stays there while the note is on screen, and the flash at the
+        /// playhead takes the same colour - in the scrolling view the note itself is behind the
+        /// legend a tenth of a second later, so the flash is what the player actually reads.
+        /// EJudgement.Auto (an auto-played lane) leaves the note in its lane colour.
+        /// </summary>
+        public void tJudge(CChip pChip, EJudgement eJudge)
+        {
+            if (pChip == null) return;
+            STNote note;
+            if (!mapNotes.TryGetValue(pChip.nChannelNumber, out note)) return;
+            if (!bJudgeColour || eJudge == EJudgement.Auto)
+            {
+                this.dicJudge.Remove(pChip);
+                return;
+            }
+            STJudge st;
+            st.eJudge = eJudge;
+            st.nJudgedMs = CDTXMania.Timer.nCurrentTime;
+            this.dicJudge[pChip] = st;
+            tLaneHit(note.nPos, colJudge(eJudge));   // a miss is not flashed by the stage; it is here
+        }
+
+        /// <summary>
+        /// Where a chip is in its fade: nJudge is the EJudgement it was given, fJudge runs from 0
+        /// (still the lane colour) to 1 (all the way over), eased out so it moves at once and then
+        /// settles. nJudge is -1 for a note that keeps its lane colour - the setting is off, the
+        /// note has not been judged, it is an auto lane, or a skip has put it back into play.
+        /// </summary>
+        private void tJudgeState(CChip pChip, out int nJudge, out float fJudge)
+        {
+            nJudge = -1;
+            fJudge = 0f;
+            if (!bJudgeColour || pChip == null || !pChip.bHit) return;
+            STJudge st;
+            if (!this.dicJudge.TryGetValue(pChip, out st)) return;
+            nJudge = (int)st.eJudge;
+            long nElapsed = CDTXMania.Timer.nCurrentTime - st.nJudgedMs;
+            if (nElapsed >= JUDGE_FADE_MS) { fJudge = 1f; return; }
+            if (nElapsed < 0) nElapsed = 0;
+            float fLeft = 1f - nElapsed / (float)JUDGE_FADE_MS;
+            fJudge = 1f - fLeft * fLeft * fLeft;    // cubic ease out
         }
 
         public override int OnUpdateAndDraw()
@@ -839,11 +950,19 @@ namespace DTXMania
                 int x = nPageX(chip.nPlaybackTimeMs, nLineIndex);
                 if (x > nRight) break;
 
+                int nJudge;
+                float fJudge;
+                tJudgeState(chip, out nJudge, out fJudge);
+                int nHeadAlpha = chip.bHit ? PAGE_HIT_ALPHA : 255;
+                if (nJudge >= 0 && nHeadAlpha < JUDGE_ALPHA) nHeadAlpha = JUDGE_ALPHA;
+
                 STPendingNote pending;
                 pending.x = x;
                 pending.nPlaybackPosition = chip.nPlaybackPosition;
-                pending.nAlpha = (chip.bHit ? PAGE_HIT_ALPHA : 255) * nAlphaScale / 255;
+                pending.nAlpha = nHeadAlpha * nAlphaScale / 255;
                 pending.note = note;
+                pending.nJudge = nJudge;
+                pending.fJudge = fJudge;
                 this.listNotes.Add(pending);
             }
             tLayoutNotes();
@@ -860,21 +979,21 @@ namespace DTXMania
         {
             STNote note;
             if (mapNotes.TryGetValue(nChannel, out note))
-                tLaneHit(note.nPos, note.nColour);
+                tLaneHit(note.nPos, colLane(note.nColour));
         }
 
         /// <summary>Same, for a hit that did not land on a chip: we only know the lane (ELane).</summary>
         public void tLaneHitByLane(int nLane)
         {
             if (nLane < 0 || nLane >= stLaneLabels.Length) return;
-            tLaneHit(stLaneLabels[nLane].nPos, stLaneLabels[nLane].nColour);
+            tLaneHit(stLaneLabels[nLane].nPos, colLane(stLaneLabels[nLane].nColour));
         }
 
-        private void tLaneHit(int nPos, int nColour)
+        private void tLaneHit(int nPos, Color col)
         {
             int i = nPos - POS_MIN;
             if (i < 0 || i >= this.ctLaneFlash.Length) return;
-            this.nLaneFlashColour[i] = nColour;
+            this.colLaneFlash[i] = col;
             if (this.ctLaneFlash[i] == null)
                 this.ctLaneFlash[i] = new CCounter(0, LANE_FLASH_MS, 1, CDTXMania.Timer);
             else
@@ -892,14 +1011,14 @@ namespace DTXMania
 
                 double dbFade = 1.0 - (double)ct.nCurrentValue / LANE_FLASH_MS;
                 int y = nBaseY - (i + POS_MIN) * nStep;
-                int nColour = this.nLaneFlashColour[i];
+                Color colFlash = this.colLaneFlash[i];
                 int nGlowW = nSc(LANE_GLOW_W);
                 // scroll mode lights the whole played region; on a page that would be most of the
                 // line, so it is a short trail behind the playhead instead
                 int nFlashLeft = bPage ? Math.Max(LABEL_GUTTER_W + PAGE_LEFT_PAD, nHeadX - PAGE_FLASH_W) : LABEL_GUTTER_W;
-                tDrawCell(SHAPE_SOLID, nColour, nFlashLeft, y - nStep,
+                tDrawCell(SHAPE_SOLID, colFlash, nFlashLeft, y - nStep,
                           nHeadX - nFlashLeft, nSpace, (int)(LANE_FLASH_ALPHA * dbFade));
-                tDrawCell(SHAPE_HEAD, nColour, nHeadX - nGlowW / 2, y - nGlowW / 2,
+                tDrawCell(SHAPE_HEAD, colFlash, nHeadX - nGlowW / 2, y - nGlowW / 2,
                           nGlowW, nGlowW, (int)(LANE_GLOW_ALPHA * dbFade));
             }
         }
@@ -941,11 +1060,19 @@ namespace DTXMania
 
             if (bAlreadyOnThisBeat(pChip.nPlaybackPosition, note.nPos)) return;
 
+            int nJudge;
+            float fJudge;
+            tJudgeState(pChip, out nJudge, out fJudge);
+            int nHeadAlpha = pChip.bHit ? 70 : 255;
+            if (nJudge >= 0 && nHeadAlpha < JUDGE_ALPHA) nHeadAlpha = JUDGE_ALPHA;
+
             STPendingNote pending;
             pending.x = x;
             pending.nPlaybackPosition = pChip.nPlaybackPosition;
-            pending.nAlpha = pChip.bHit ? 70 : 255;
+            pending.nAlpha = nHeadAlpha;
             pending.note = note;
+            pending.nJudge = nJudge;
+            pending.fJudge = fJudge;
             this.listNotes.Add(pending);
         }
 
@@ -1071,7 +1198,25 @@ namespace DTXMania
                 STNote note = this.listNotes[i].note;
                 int y = nBaseY - note.nPos * nStep;
                 int w = nHeadCell(note.nShape);
-                tDrawCell(note.nShape, note.nColour, this.listNotes[i].x - w / 2, y - w / 2, w, w, this.listNotes[i].nAlpha);
+                int xHead = this.listNotes[i].x;
+                int nAlpha = this.listNotes[i].nAlpha;
+                if (this.listNotes[i].nJudge < 0)
+                {
+                    tDrawCell(note.nShape, note.nColour, xHead - w / 2, y - w / 2, w, w, nAlpha);
+                    continue;
+                }
+                EJudgement eJudge = (EJudgement)this.listNotes[i].nJudge;
+                float fJudge = this.listNotes[i].fJudge;
+                tDrawCell(note.nShape, colBlend(colLane(note.nColour), colJudge(eJudge), fJudge),
+                          xHead - w / 2, y - w / 2, w, w, nAlpha);
+                if (bBoxedJudge(eJudge))
+                {
+                    // round heads are a good deal wider than they are tall, so the box follows the
+                    // head rather than the cell; the x and diamond heads are square and get a square
+                    int nBoxX = nHeadHalfWidth(note.nShape) + nSc(MISS_BOX_PAD);
+                    int nBoxY = (note.nShape == SHAPE_HEAD) ? nBoxX * 3 / 4 : nBoxX;
+                    tDrawMissBox(xHead, y, nBoxX, nBoxY, colJudge(eJudge), (int)(nAlpha * fJudge));
+                }
             }
         }
 
@@ -1156,6 +1301,34 @@ namespace DTXMania
             if (x < LABEL_GUTTER_W || x > 1284) return;
             tDrawCell(SHAPE_SOLID, C_PLAYHEAD, x - 1, BAND_TOP_Y + 8, 2, BAND_BOTTOM_Y - BAND_TOP_Y - 16, 200);
             CDTXMania.actDisplayString.tPrint(x + 4, BAND_BOTTOM_Y - 18, CCharacterConsole.EFontType.White, bIsEnd ? "End loop" : "Begin loop");
+        }
+
+        /// <summary>
+        /// The square around a missed notehead: the one cue that is not a colour, so a miss is
+        /// still a miss for a player who cannot tell the red from the green.
+        /// </summary>
+        private void tDrawMissBox(int x, int y, int nHalfX, int nHalfY, Color col, int nAlpha)
+        {
+            if (nAlpha <= 0) return;
+            int nThick = nSc(MISS_BOX_H);
+            int nW = 2 * nHalfX, nH = 2 * nHalfY;
+            tDrawCell(SHAPE_SOLID, col, x - nHalfX, y - nHalfY, nW, nThick, nAlpha);
+            tDrawCell(SHAPE_SOLID, col, x - nHalfX, y + nHalfY - nThick, nW, nThick, nAlpha);
+            tDrawCell(SHAPE_SOLID, col, x - nHalfX, y - nHalfY, nThick, nH, nAlpha);
+            tDrawCell(SHAPE_SOLID, col, x + nHalfX - nThick, y - nHalfY, nThick, nH, nAlpha);
+        }
+
+        /// <summary>
+        /// The same cell in any colour at all: the sheet's white row, modulated by the tint. Drawn
+        /// with a lane's own colour this is pixel for pixel that lane's row, so the sprite sheet
+        /// still holds the palette and only the in-between shades of a fade come from here.
+        /// </summary>
+        private void tDrawCell(int nShape, Color col, int x, int y, int w, int h, int nAlpha)
+        {
+            if (w <= 0 || h <= 0) return;
+            this.tx.tSetTint(col.R / 255f, col.G / 255f, col.B / 255f);
+            tDrawCell(nShape, C_WHITE, x, y, w, h, nAlpha);
+            this.tx.tClearTint();
         }
 
         /// <summary>Draw one 64x64 sprite cell (shape column, colour row) stretched to w x h at (x, y).</summary>

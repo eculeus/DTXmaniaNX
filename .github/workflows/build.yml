@@ -243,6 +243,14 @@ jobs:
             '  [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h, out RECT r);',
             '  [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr h);',
             '  [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);',
+            '  [DllImport("user32.dll")] public static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtra);',
+            '  [DllImport("user32.dll")] public static extern uint MapVirtualKey(uint uCode, uint uMapType);',
+            '  public static void Tap(byte vk, int holdMs) {',
+            '    byte sc = (byte)MapVirtualKey(vk, 0);',
+            '    keybd_event(vk, sc, 0, UIntPtr.Zero);',
+            '    System.Threading.Thread.Sleep(holdMs);',
+            '    keybd_event(vk, sc, 2, UIntPtr.Zero);   // 2 = KEYEVENTF_KEYUP',
+            '  }',
             '}'
           ) -join [Environment]::NewLine)
           $game = Join-Path $PWD 'game'
@@ -273,8 +281,20 @@ jobs:
             $bounds = [System.Windows.Forms.SystemInformation]::VirtualScreen
             Write-Host "Desktop is $($bounds.Width)x$($bounds.Height)"
 
+            # SD is the one drum lane left to the player, so play it while the frames are taken: a
+            # tap every ~250 ms lands close enough to the chart's snare notes often enough that the
+            # captures show real judgements - the hit colours as well as the misses an untouched run
+            # gives. VK 0x43 = C, which is DrumsKeyAssign SD's first default (K012 -> SlimDX Key C).
+            # Keys go in with keybd_event because DTXMania reads the keyboard through DirectInput.
+            # A tap that lands on no chip is an empty hit and costs nothing.
+            $VK_SNARE = 0x43
             for ($i = 1; $i -le 17; $i++) {
-              Start-Sleep -Seconds 2
+              for ($k = 1; $k -le 8; $k++) {
+                $hFocus = $proc.MainWindowHandle
+                if ($hFocus -ne [IntPtr]::Zero) { [void][Win32]::SetForegroundWindow($hFocus) }
+                [Win32]::Tap([byte]$VK_SNARE, 30)
+                Start-Sleep -Milliseconds 220
+              }
               $proc.Refresh()
               if ($proc.HasExited) {
                 Write-Host "!! DTXManiaNX exited after $($i * 2)s with code $($proc.ExitCode)"

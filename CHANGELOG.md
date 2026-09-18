@@ -9,6 +9,22 @@ Builds are produced by GitHub Actions (`.github/workflows/build.yml`, Release x8
 extracting the zip over an existing DTXManiaNX folder; `Config.ini` is not included, so key
 bindings and settings are kept.
 
+## 1.5.0-beta.17 — 2026-09-18
+
+- Notation view: a note takes the colour of its judgement as it is played and keeps it while it
+  is on screen, so the part of the staff already gone by reads as a report of how it went. The
+  head eases from its lane colour over to Perfect ice blue, Great sea green, Good gold, Poor
+  violet or Miss red over 180 ms (cubic ease out, on the clock, so the fade is the same at any
+  frame rate), and a missed head is boxed as well as reddened - the one cue that is not a colour.
+  A judged head is also drawn stronger than a plain played one (alpha 170, against 70 scrolling
+  and 102 on the page) since its colour is the thing being read. Works in both scroll and page
+  mode; the playhead, bar lines, beat ticks, legend and the rest of the HUD are untouched.
+- Notation view: the flash at the playhead takes the judgement's colour too, and a miss now
+  flashes where it used to flash nothing. In scroll mode the note itself is behind the legend
+  about a tenth of a second after the playhead, so the flash is what is actually read there.
+- Auto-played lanes are not judged and keep their lane colour, in both the head and the flash.
+- New setting `DrumsNotationJudgeColour` (CONFIG -> Drums -> NotationJudge), default ON.
+
 ## 1.5.0-beta.16 — 2026-09-14
 
 - Page mode: the playhead no longer runs past a line's closing bar line. Since the bar lines
