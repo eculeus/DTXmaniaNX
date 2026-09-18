@@ -126,6 +126,7 @@ namespace DTXMania
 			base.listChildActivities.Add( this.actShowCurrentPosition = new CActSelectShowCurrentPosition() );
 			base.listChildActivities.Add(this.actBackgroundVideoAVI = new CActSelectBackgroundAVI());
 			base.listChildActivities.Add( this.actQuickConfig = new CActSelectQuickConfig() );
+			base.listChildActivities.Add( this.actPracticePanel = new CActSelectPracticePanel() );
 
 			//
 			base.listChildActivities.Add(this.actTextBox = new CActTextBox());
@@ -145,6 +146,7 @@ namespace DTXMania
 			this.actPresound.t選択曲が変更された();
 			this.actPerHistoryPanel.t選択曲が変更された();
 			this.actHighScorePanel.tSelectedSongChanged();		// ステータスパネルの "BEST:" が読むので、先に更新しておくこと。
+			this.actPracticePanel.tSelectedSongChanged();		// 別の曲へ移ったら練習の区間選択は捨てる。
 			this.actStatusPanel.tSelectedSongChanged();
 			this.actArtistComment.t選択曲が変更された();
 
@@ -463,7 +465,7 @@ namespace DTXMania
 						return 0;
 					}
 					#endregion
-					if ( !this.actSortSongs.bIsActivePopupMenu && !this.actQuickConfig.bIsActivePopupMenu && !CDTXMania.app.bテキスト入力中)
+					if ( !this.actSortSongs.bIsActivePopupMenu && !this.actQuickConfig.bIsActivePopupMenu && !this.actPracticePanel.bIsActivePopupMenu && !CDTXMania.app.bテキスト入力中)
 					{
                         #region [ ESC ]
                         if (CDTXMania.InputManager.Keyboard.bKeyPressed((int)SlimDXKey.Escape) || ((CDTXMania.Pad.bPressed(EInstrumentPart.DRUMS, EPad.LC) || CDTXMania.Pad.bPressedGB(EPad.Cancel)) && ((this.actSongList.rSelectedSong != null) && (this.actSongList.rSelectedSong.r親ノード == null))))
@@ -486,20 +488,17 @@ namespace DTXMania
                             return 0;
                         }
 						#endregion
-						#region [ Shift-F2: 未使用 ]
+						#region [ Shift-F2: PRACTICE ]
 						// #24525 2011.3.16 yyagi: [SHIFT]+[F2]は廃止(将来発生するかもしれない別用途のためにキープ)
-						/*
-                        if ((CDTXMania.InputManager.Keyboard.bKeyPressing((int)SlimDXKey.RightShift) || CDTXMania.InputManager.Keyboard.bKeyPressing((int)SlimDXKey.LeftShift)) &&
-                            CDTXMania.InputManager.Keyboard.bKeyPressed((int)SlimDXKey.F2))
-                        {	// [SHIFT] + [F2] CONFIGURATION
-                            this.actPresound.tサウンド停止();
-                            this.eReturnValueAfterFadeOut = EReturnValue.オプション呼び出し;
-                            this.actFIFO.tStartFadeOut();
-                            base.ePhaseID = CStage.EPhase.Common_FadeOut;
-                            CDTXMania.Skin.soundCancel.tPlay();
-                            return 0;
-                        }
-						*/
+						// ...その別用途がこれ。Config の PracticeMode が ON のときだけ、ループ区間を選ぶパネルを開く。
+						if ( CDTXMania.ConfigIni.bPracticeMode &&
+							( CDTXMania.InputManager.Keyboard.bKeyPressing( (int) SlimDXKey.RightShift ) || CDTXMania.InputManager.Keyboard.bKeyPressing( (int) SlimDXKey.LeftShift ) ) &&
+							CDTXMania.InputManager.Keyboard.bKeyPressed( (int) SlimDXKey.F2 ) )
+						{	// [SHIFT] + [F2] PRACTICE
+							CDTXMania.Skin.soundDecide.tPlay();
+							this.actPracticePanel.tActivatePopupMenu();
+							return 0;
+						}
 						#endregion
 						if (this.actSongList.rSelectedSong != null)
                         {
@@ -740,7 +739,8 @@ namespace DTXMania
 					}
 
 					#region [Test text field]
-					if (!CDTXMania.app.bテキスト入力中 && CDTXMania.Pad.bPressed(EKeyConfigPart.SYSTEM, EKeyConfigPad.Search))
+					// 練習パネルが開いている間は検索を開かない。(既定の Search キーは BackSpace で、パネルの入力と被る)
+					if (!CDTXMania.app.bテキスト入力中 && !this.actPracticePanel.bIsActivePopupMenu && CDTXMania.Pad.bPressed(EKeyConfigPart.SYSTEM, EKeyConfigPad.Search))
 					{
 						CDTXMania.Skin.soundDecide.tPlay();
 						this.actTextBox.t表示();
@@ -750,6 +750,7 @@ namespace DTXMania
 
 					this.actSortSongs.tUpdateAndDraw();
 					this.actQuickConfig.tUpdateAndDraw();
+					this.actPracticePanel.tUpdateAndDraw();
 					this.actTextBox.OnUpdateAndDraw();
 					if (actTextBox.b入力が終了した)
 					{
@@ -903,6 +904,7 @@ namespace DTXMania
 
 		private CActSortSongs actSortSongs;
 		private CActSelectQuickConfig actQuickConfig;
+		private CActSelectPracticePanel actPracticePanel;  // 練習モードのループ区間選び (Shift+F2)
 
 		//
 		private CActTextBox actTextBox;
@@ -1108,6 +1110,12 @@ namespace DTXMania
 			this.rConfirmedSong = this.actSongList.rSelectedSong;
 			this.rChosenScore = this.actSongList.rSelectedScore;
 			this.nConfirmedSongDifficulty = this.actSongList.n現在選択中の曲の現在の難易度レベル;
+
+			// 練習モードが OFF なら、前に選んだ区間が残っていても使わない。
+			if( !CDTXMania.ConfigIni.bPracticeMode )
+				CDTXMania.rPracticeRange = null;
+			if( CDTXMania.rPracticeRange != null )
+				Trace.TraceInformation( "practice: 区間 \"{0}\" [{1}] で演奏します。", CDTXMania.rPracticeRange.strName, CDTXMania.rPracticeRange.strRangeText );
 			//
 			bool bScoreExistForMode = this.tCheckScoreExistForMode(this.rChosenScore);
 			if ( ( this.rConfirmedSong != null ) && ( this.rChosenScore != null ) && bScoreExistForMode)

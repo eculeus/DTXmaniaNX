@@ -181,6 +181,7 @@
     <Compile Include="Code\Score,Song\CBoxDef.cs" />
     <Compile Include="Code\Score,Song\CDTX.cs" />
     <Compile Include="Code\Score,Song\CHighScores.cs" />
+    <Compile Include="Code\Score,Song\CPracticeSections.cs" />
     <Compile Include="Code\Score,Song\CScoreIni.cs" />
     <Compile Include="Code\Score,Song\CSetDef.cs" />
     <Compile Include="Code\Stage\02.Title\CEnumSongs.cs" />
@@ -198,6 +199,7 @@
     <Compile Include="Code\Stage\05.SongSelection\CActSelectHighScorePanel.cs" />
     <Compile Include="Code\Stage\05.SongSelection\CActSelectInformation.cs" />
     <Compile Include="Code\Stage\05.SongSelection\CActSelectPopupMenu.cs" />
+    <Compile Include="Code\Stage\05.SongSelection\CActSelectPracticePanel.cs" />
     <Compile Include="Code\Stage\05.SongSelection\CActSelectPreimagePanel.cs" />
     <Compile Include="Code\Stage\05.SongSelection\CActSelectPresound.cs" />
     <Compile Include="Code\Stage\05.SongSelection\CActSelectQuickConfig.cs" />

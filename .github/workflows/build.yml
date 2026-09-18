@@ -165,6 +165,8 @@ jobs:
           $dtx = $dtx -replace '(?m)^#DLEVEL:.*$', '#DLEVEL: 30'
           [System.IO.File]::WriteAllBytes((Join-Path $PWD 'song\smoke2.dtx'), $enc.GetBytes($dtx))
           Copy-Item Tests\SmokeSong\set.def song\ -Force
+          # Practice sections for the practice-loop run below. Travels with the song folder.
+          Copy-Item Tests\SmokeSong\sections.def song\ -Force
 
           # Seed the named high score tables. One file per chart, one section per difficulty slot,
           # and every name says which chart and which slot it came from, so a frame of the song
@@ -497,6 +499,211 @@ jobs:
             throw "the song-select run rendered $($frames.Count) frame(s) - see DTXManiaLog_select.txt"
           }
 
+      # Fourth launch: the practice loop. Boots to the title screen, walks into song select,
+      # opens the PRACTICE panel with Shift+F2, picks the "Verse" section out of the song
+      # folder's sections.def, starts the song, and watches it loop. The section resolves to a
+      # fixed pair of milliseconds that this step asserts, which is the real test of the
+      # bar -> ms conversion: it has to get DTXMania's inserted empty bar, a 1/4 bar, a 3/4 bar
+      # and a mid-chart tempo change all right to land on them.
+      - name: Practice loop - pick a section in song select and loop it
+        shell: powershell
+        timeout-minutes: 8
+        run: |
+          $ErrorActionPreference = 'Continue'
+          Add-Type -AssemblyName System.Drawing
+          Add-Type -AssemblyName System.Windows.Forms
+          Add-Type -TypeDefinition (@(
+            'using System;',
+            'using System.Runtime.InteropServices;',
+            'public class Drive2 {',
+            '  [DllImport("user32.dll")] public static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtra);',
+            '  [DllImport("user32.dll")] public static extern uint MapVirtualKey(uint uCode, uint uMapType);',
+            '  [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);',
+            '  // The arrow keys are EXTENDED keys. Without KEYEVENTF_EXTENDEDKEY (1) their scan code',
+            '  // is the num-pad one, and DirectInput - which is how DTXMania reads the keyboard -',
+            '  // sees DIK_NUMPAD2 instead of DIK_DOWN, so the press lands nowhere.',
+            '  public static void Down(byte vk, bool ext) { keybd_event(vk, (byte)MapVirtualKey(vk, 0), ext ? 1u : 0u, UIntPtr.Zero); }',
+            '  public static void Up(byte vk, bool ext)   { keybd_event(vk, (byte)MapVirtualKey(vk, 0), ext ? 3u : 2u, UIntPtr.Zero); }',
+            '  public static void Tap(byte vk, int holdMs) { TapEx(vk, holdMs, false); }',
+            '  public static void TapEx(byte vk, int holdMs, bool ext) {',
+            '    Down(vk, ext); System.Threading.Thread.Sleep(holdMs); Up(vk, ext);',
+            '  }',
+            '  public static void TapShift(byte vk, int holdMs) {',
+            '    Down(0xA0, false); System.Threading.Thread.Sleep(60); Tap(vk, holdMs); System.Threading.Thread.Sleep(60); Up(0xA0, false);',
+            '  }',
+            '}'
+          ) -join [Environment]::NewLine)
+
+          $game    = Join-Path $PWD 'game'
+          $exe     = Join-Path $game 'DTXManiaNX.exe'
+          $songDir = Join-Path $PWD 'song'
+          $logPath = Join-Path $game 'DTXManiaLog.txt'
+          $shots   = Join-Path $PWD 'screenshots'
+          New-Item -ItemType Directory -Force -Path $shots | Out-Null
+
+          function Read-GameLog([string]$path) {
+            if (-not (Test-Path $path)) { return '' }
+            try {
+              $fs = [System.IO.File]::Open($path, 'Open', 'Read', 'ReadWrite')
+              $sr = New-Object System.IO.StreamReader($fs)
+              $t = $sr.ReadToEnd(); $sr.Close(); $fs.Close(); return $t
+            } catch { return '' }
+          }
+
+          # Everything on auto-play so the loop actually scores hits and builds a combo: the
+          # frames then show the combo/judgement counters being folded back at each wrap.
+          $cfg = @(
+            '; Written by the CI smoke job (practice loop run).',
+            '[System]',
+            "DTXPath=$songDir",
+            'FullScreen=0', 'WindowWidth=1024', 'WindowHeight=576', 'WindowX=0', 'WindowY=0',
+            'VSyncWait=0', 'SoundDeviceType=0',
+            'Drums=1', 'Guitar=0', 'MovieMode=0', 'AVI=0', 'BGA=0',
+            'TimeStretch=0', 'PlaySpeed=20', 'BGMSound=1', 'MasterVolume=0',
+            '[Log]', 'OutputLog=1', 'TraceSongSearch=1',
+            '[PlayOption]',
+            'DrumsNotationView=1',
+            'DrumsScrollSpeed=3',
+            'PracticeMode=1',                # <- the feature under test; off by default
+            '[AutoPlay]',
+            'LC=1', 'HH=1', 'SD=1', 'BD=1', 'HT=1', 'LT=1',
+            'FT=1', 'CY=1', 'RD=1', 'LP=1', 'LBD=1'
+          )
+          $cfgPath = Join-Path $game 'Config.ini'
+          [System.IO.File]::WriteAllLines($cfgPath, $cfg, (New-Object System.Text.ASCIIEncoding))
+
+          # A stale PracticeRanges.ini from an earlier run would add rows to the list and move
+          # the cursor, so start from a clean one.
+          Remove-Item (Join-Path $game 'PracticeRanges.ini') -ErrorAction SilentlyContinue
+          Remove-Item $logPath -ErrorAction SilentlyContinue
+
+          $env:DTXMANIA_AUTOCAPTURE_MS = '1000'
+          $env:FDK_ALLOW_SILENT_SOUND_DEVICE = '1'
+
+          $VK_RETURN = 0x0D
+          $VK_DOWN   = 0x28
+          $VK_F2     = 0x71
+          $VK_EQUALS = 0xBB      # the Restart key, "=" by default
+
+          Write-Host "Launching (practice loop): $exe   DTXPath=$songDir"
+          $proc = Start-Process -FilePath $exe -WorkingDirectory $game -PassThru
+          $bounds = [System.Windows.Forms.SystemInformation]::VirtualScreen
+
+          function Focus-Game { $h = $proc.MainWindowHandle; if ($h -ne [IntPtr]::Zero) { [void][Drive2]::SetForegroundWindow($h) } }
+          function Snap([string]$tag) {
+            try {
+              $bmp = New-Object System.Drawing.Bitmap($bounds.Width, $bounds.Height)
+              $g = [System.Drawing.Graphics]::FromImage($bmp)
+              $g.CopyFromScreen($bounds.X, $bounds.Y, 0, 0, $bmp.Size)
+              $g.Dispose()
+              $bmp.Save((Join-Path $shots ("desktop_practice_{0}.png" -f $tag)), [System.Drawing.Imaging.ImageFormat]::Png)
+              $bmp.Dispose()
+            } catch { Write-Host "desktop capture failed: $_" }
+          }
+
+          # Title -> song select
+          $reachedSelect = $false
+          for ($t = 1; $t -le 25; $t++) {
+            Start-Sleep -Seconds 1
+            $proc.Refresh()
+            if ($proc.HasExited) { Write-Host "!! exited after ${t}s code $($proc.ExitCode)"; break }
+            $log = Read-GameLog $logPath
+            if ($log -match 'SongSelection') { $reachedSelect = $true; Write-Host "t=${t}s song select reached"; break }
+            if ($log -match 'Title') { Focus-Game; [Drive2]::Tap([byte]$VK_RETURN, 80); Start-Sleep -Milliseconds 800 }
+          }
+          for ($t = 1; $t -le 5; $t++) { Focus-Game; Start-Sleep -Seconds 1 }
+          Snap 'select'
+
+          if (-not $proc.HasExited) {
+            # Shift+F2 opens the PRACTICE panel.
+            Focus-Game
+            Write-Host "Shift+F2 (open the practice panel)"
+            [Drive2]::TapShift([byte]$VK_F2, 80)
+            for ($t = 1; $t -le 3; $t++) { Focus-Game; Start-Sleep -Seconds 1 }
+            Snap 'panel'
+
+            # Row 0 is "OFF"; one Down lands on the first section from sections.def ("Verse").
+            Focus-Game
+            [Drive2]::TapEx([byte]$VK_DOWN, 80, $true)
+            Start-Sleep -Seconds 2
+            Focus-Game
+            Snap 'panel_verse'
+
+            # Enter picks it and closes the panel; the song-select indicator then shows the range.
+            [Drive2]::Tap([byte]$VK_RETURN, 80)
+            for ($t = 1; $t -le 3; $t++) { Focus-Game; Start-Sleep -Seconds 1 }
+            Snap 'picked'
+
+            # Enter again decides the song (Return is not bound to any pad by default).
+            Focus-Game
+            [Drive2]::Tap([byte]$VK_RETURN, 80)
+
+            # ~50 s of play: the loop is about 8.7 s long, so this should wrap several times.
+            # Half way through, press the Restart key: in practice mode that must rewind to the
+            # start of the range and stay on the performance screen, not drop back to song loading.
+            for ($i = 1; $i -le 25; $i++) {
+              Start-Sleep -Seconds 2
+              $proc.Refresh()
+              if ($proc.HasExited) { Write-Host "!! exited during play after $($i * 2)s code $($proc.ExitCode)"; break }
+              Focus-Game
+              if ($i -eq 13) {
+                Write-Host "pressing '=' (Restart) mid-loop"
+                [Drive2]::Tap([byte]$VK_EQUALS, 80)
+                Start-Sleep -Milliseconds 700
+                Focus-Game
+                Snap 'after_restart'
+              }
+              if (($i % 5) -eq 0) { Snap ("play{0:D2}" -f $i) }
+            }
+          }
+
+          if (-not $proc.HasExited) { Stop-Process -Id $proc.Id -Force }
+          Start-Sleep -Seconds 2
+          Get-Process -Name DTXManiaNX -ErrorAction SilentlyContinue | Stop-Process -Force
+          Start-Sleep -Seconds 1
+
+          $raw  = Join-Path $game 'Capture_img'
+          $dest = Join-Path $game 'Capture_img_practice'
+          $frames = @(Get-ChildItem $raw -ErrorAction SilentlyContinue)
+          Write-Host "=== Capture_img (practice): $($frames.Count) frames, song select reached: $reachedSelect ==="
+          if (Test-Path $dest) { Remove-Item $dest -Recurse -Force }
+          if (Test-Path $raw) { Move-Item $raw $dest }
+          Copy-Item $cfgPath (Join-Path $game 'Config_practice.ini') -Force
+          if (Test-Path $logPath) { Copy-Item $logPath (Join-Path $game 'DTXManiaLog_practice.txt') -Force }
+          if (Test-Path (Join-Path $game 'PracticeRanges.ini')) {
+            Copy-Item (Join-Path $game 'PracticeRanges.ini') (Join-Path $game 'PracticeRanges_practice.ini') -Force
+          }
+
+          $log = Read-GameLog $logPath
+          Write-Host "=== practice lines from the log ==="
+          ($log -split "`r?`n") | Where-Object { $_ -match 'PRACTICE|practice:|Reached end of loop' } | ForEach-Object { Write-Host $_ }
+
+          # The section is bars 002..006 with a one-bar lead, so on this chart it must resolve to
+          # 4000 ms -> 12666 ms. Getting there needs the inserted empty bar (2000 ms), bar 000
+          # (2000 ms), the 1/4 bar 001 (500 ms), the 3/4 bar 003 (1500 ms) and the 120 -> 90 BPM
+          # change at bar 005 (2666 ms) all counted correctly.
+          $m = [regex]::Match($log, 'PRACTICE: loop "Verse".*?= *(\d+)ms -> *(\d+)ms')
+          if (-not $m.Success) { throw "the practice range was never applied - see DTXManiaLog_practice.txt in the artifact" }
+          $startMs = [int]$m.Groups[1].Value
+          $endMs   = [int]$m.Groups[2].Value
+          Write-Host "practice range resolved to ${startMs}ms -> ${endMs}ms"
+          if ($startMs -ne 4000) { throw "practice loop start is ${startMs}ms, expected 4000ms" }
+          if (($endMs -lt 12660) -or ($endMs -gt 12670)) { throw "practice loop end is ${endMs}ms, expected about 12666ms" }
+
+          $wraps = ([regex]::Matches($log, 'Reached end of loop')).Count
+          Write-Host "loop wrapped $wraps time(s)"
+          if ($wraps -lt 2) { throw "the loop wrapped $wraps time(s); expected at least 2 in 50 s of a 8.7 s loop" }
+
+          # The Restart key must rewind inside the range...
+          if ($log -notmatch 'PRACTICE: rewind to 4000ms') {
+            throw "'=' did not rewind to the start of the range - see DTXManiaLog_practice.txt"
+          }
+          # ...and must NOT have taken the song back through the loading screen.
+          $loads = ([regex]::Matches($log, 'SongLoading')).Count
+          Write-Host "song loading screen entered $loads time(s) (expected exactly 1)"
+          if ($loads -ne 1) { throw "'=' restarted the song instead of rewinding the loop ($loads loads)" }
+          if ($frames.Count -lt 10) { throw "the practice run rendered $($frames.Count) frame(s)" }
+
       - name: Show DTXManiaLog.txt
         if: always()
         shell: pwsh
@@ -518,4 +725,5 @@ jobs:
             game/Config*.ini
             song/*.dtx
             song/set.def
+            song/sections.def
             song/*.scores.ini

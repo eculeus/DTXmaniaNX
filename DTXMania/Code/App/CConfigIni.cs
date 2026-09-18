@@ -679,6 +679,7 @@ namespace DTXMania
 		public bool bDrumsNotationStems;  // ...with note stems and beams (off: noteheads only)
 		public bool bDrumsNotationJudgeColour;  // ...and a judged note takes the colour of its judgement
 		public int nDrumsNotationBarsPerLine;   // page view: bars per staff line (ini only, 1-8)
+		public bool bPracticeMode;        // practice loop: song select offers a loop range; nothing is scored
 		public bool bScoreIniを出力する;
 		public bool bSTAGEFAILEDEnabled;
 		public STDGBVALUE<bool> bSudden;
@@ -1401,6 +1402,7 @@ namespace DTXMania
 			this.bDrumsNotationStems = true;
 			this.bDrumsNotationJudgeColour = true;
 			this.nDrumsNotationBarsPerLine = 4;
+			this.bPracticeMode = false;
 			this.eRandom = new STDGBVALUE<ERandomMode>();
 			this.bLight = new STDGBVALUE<bool>();
 			this.bSpecialist = new STDGBVALUE<bool>();
@@ -2076,6 +2078,9 @@ namespace DTXMania
 			sw.WriteLine( "DrumsNotationJudgeColour={0}", this.bDrumsNotationJudgeColour ? 1 : 0 );
 			sw.WriteLine( "; Drums notation page view: how many bars fit on one staff line (1-8)" );
 			sw.WriteLine( "DrumsNotationBarsPerLine={0}", this.nDrumsNotationBarsPerLine );
+			sw.WriteLine();
+			sw.WriteLine( "; Practice loop mode: 1 = song select offers a loop range (Shift+F2) and the run is not scored" );
+			sw.WriteLine( "PracticeMode={0}", this.bPracticeMode ? 1 : 0 );
 			sw.WriteLine();
 			sw.WriteLine( "; ギター/ベースRANDOMモード(0:OFF, 1:Mirror, 2:Random, 3:SuperRandom, 4:HyperRandom)" );
 			sw.WriteLine( "GuitarRandom={0}", (int) this.eRandom.Guitar );
@@ -3293,6 +3298,10 @@ namespace DTXMania
 											else if ( str3.Equals( "DrumsNotationJudgeColour" ) )
 											{
 												this.bDrumsNotationJudgeColour = CConversion.bONorOFF( str4[ 0 ] );
+											}
+											else if ( str3.Equals( "PracticeMode" ) )
+											{
+												this.bPracticeMode = CConversion.bONorOFF( str4[ 0 ] );
 											}
 											else if( str3.Equals( "GuitarReverse" ) )
 											{
