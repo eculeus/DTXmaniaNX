@@ -1,0 +1,31 @@
+; Hand-authored practice sections for "His Mercy Is More" (Sing! 2023 live).
+; Used to debug the sections reader; see docs/practice-mode.md for the format.
+;
+; This chart is the awkward case on purpose: a 1/4 pickup (bar 001), 6/4 throughout
+; (#nnn02: 1.5) with single 3/4 turnaround bars at 030, 051 and 087, and a ritardando
+; in bar 095 that puts SIX BPM chips inside one bar.
+;
+; Bar numbers are .dtx file bar numbers - the nnn in "#nnn13:" - not the game's
+; internal ones. End positions are exclusive: a section ends where the next begins.
+
+#VERSION: 1
+#BARBASE: DTX
+#LEADBARS: 1
+
+#SECTION: 000,009,Intro (no drums)
+#SECTION: 009,014,Verse 1
+#SECTION: 014,020,Verse 2 (hats)
+#SECTION: 020,030,Chorus 1
+#SECTION: 030,031,Turnaround 1 (3/4),0
+#SECTION: 031,039,Verse 3
+#SECTION: 039,042,Verse 4 (hats)
+#SECTION: 042,051,Chorus 2
+#SECTION: 051,052,Turnaround 2 (3/4),0
+#SECTION: 052,060,Chorus 3
+#SECTION: 060,063,Breakdown (drums out)
+#SECTION: 063,069,Bridge build
+#SECTION: 069,078,Chorus 4
+#SECTION: 078,081,Quiet
+#SECTION: 081,088,Build
+#SECTION: 088,096,Final chorus
+#SECTION: 096,099,Outro (rit.)

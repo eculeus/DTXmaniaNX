@@ -62,6 +62,13 @@ namespace DTXMania
         /// </summary>
         public static CDiscordRichPresence DiscordRichPresence { get; private set; }
 
+        /// <summary>
+        /// <para>練習モード(PRACTICE)でループさせる区間。選曲画面の PRACTICE パネルが入れ、
+        /// 演奏画面が OnActivate 時に ms へ変換してループを組む。null なら曲を最後まで通して演奏する。</para>
+        /// <para>ConfigIni.bPracticeMode が OFF のときは常に null。詳細は docs/practice-mode.md。</para>
+        /// </summary>
+        public static CPracticeRange rPracticeRange;
+
         public static CDTX DTX
         {
             get

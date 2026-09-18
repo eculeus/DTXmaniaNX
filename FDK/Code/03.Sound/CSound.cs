@@ -615,7 +615,10 @@ namespace FDK
 					_db周波数倍率 = value;
 					if (bIsBASS)
 					{
-						Bass.BASS_ChannelSetAttribute(this.hBassStream, BASSAttribute.BASS_ATTRIB_FREQ, (float)(_db周波数倍率 * _db再生速度 * nオリジナルの周波数));
+						// TimeStretch時は、再生速度はテンポで変えているので、ここで再生速度を周波数に
+						// 掛けてはならない。(掛けると、bad hitで周波数倍率が変わったチップだけ、
+						// 再生速度がピッチとしても二重に適用されてしまう。)
+						tBASS再生速度と周波数を適用する();
 					}
 					else
 					{
@@ -638,28 +641,16 @@ namespace FDK
 				if (_db再生速度 != value)
 				{
 					_db再生速度 = value;
-					bIs1倍速再生 = (_db再生速度 == 1.000f);
 					if (bIsBASS)
 					{
-						if (_hTempoStream != 0 && !this.bIs1倍速再生)   // 再生速度がx1.000のときは、TempoStreamを用いないようにして高速化する
-						{
-							this.hBassStream = _hTempoStream;
-						}
-						else
-						{
-							this.hBassStream = _hBassStream;
-						}
-
-						if (CSoundManager.bIsTimeStretch)
-						{
-							Bass.BASS_ChannelSetAttribute(this.hBassStream, BASSAttribute.BASS_ATTRIB_TEMPO, (float)(dbPlaySpeed * 100 - 100));
-							//double seconds = Bass.BASS_ChannelBytes2Seconds( this.hTempoStream, nBytes );
-							//this.n総演奏時間ms = (int) ( seconds * 1000 );
-						}
-						else
-						{
-							Bass.BASS_ChannelSetAttribute(this.hBassStream, BASSAttribute.BASS_ATTRIB_FREQ, (float)(_db周波数倍率 * _db再生速度 * nオリジナルの周波数));
-						}
+						// 再生に使うハンドルは、TempoStreamの有無だけで決まる。(再生速度では変えない。)
+						// 速度によってハンドルを繋ぎ替えると、繋ぎ替え前のハンドルがミキサーに残ったまま
+						// 新しいハンドルが追加され、同じデコード元を2重に消費して再生速度が狂うため。
+						// 万一ハンドルが変わる場合に備えて、繋ぎ替えはミキサーからの削除を伴うメソッドで行う。
+						tBASS再生に使用するハンドルを設定する(this.n再生に使用するハンドル);
+						tBASS再生速度と周波数を適用する();
+						//double seconds = Bass.BASS_ChannelBytes2Seconds( this.hTempoStream, nBytes );
+						//this.n総演奏時間ms = (int) ( seconds * 1000 );
 					}
 					else
 					{
@@ -1210,8 +1201,10 @@ namespace FDK
 				{
 					// 基本的にはBASS_ACTIVE_PLAYINGなら再生中だが、最後まで再生しきったchannelも
 					// BASS_ACTIVE_PLAYINGのままになっているので、小細工が必要。
+					// 比較する長さは、実際に再生しているハンドルのもの。(TempoStreamは元のストリームと
+					// サンプル形式が異なることがあり、nBytes(元のストリーム)とはバイト数が一致しない。)
 					bool ret = (BassMix.BASS_Mixer_ChannelIsActive(this.hBassStream) == BASSActive.BASS_ACTIVE_PLAYING);
-					if (BassMix.BASS_Mixer_ChannelGetPosition(this.hBassStream) >= nBytes)
+					if (BassMix.BASS_Mixer_ChannelGetPosition(this.hBassStream) >= nBytes再生ハンドル)
 					{
 						ret = false;
 					}
@@ -1487,16 +1480,23 @@ namespace FDK
 			{
 				#region [ ASIO, WASAPI の解放 ]
 				//-----------------
+				BassMix.BASS_Mixer_ChannelRemove(this._hBassStream);
 				if (_hTempoStream != 0)
 				{
 					BassMix.BASS_Mixer_ChannelRemove(this._hTempoStream);
+					// BASS_FX_FREESOURCE付きで生成しているので、TempoStreamを解放すると元のストリームも
+					// 解放される。ここで元のストリームを明示的に解放すると、解放済み(＝他のストリームに
+					// 使い回されているかもしれない)ハンドルを解放してしまうため、解放しない。
 					Bass.BASS_StreamFree(this._hTempoStream);
 				}
-				BassMix.BASS_Mixer_ChannelRemove(this._hBassStream);
-				Bass.BASS_StreamFree(this._hBassStream);
+				else
+				{
+					Bass.BASS_StreamFree(this._hBassStream);
+				}
 				this.hBassStream = -1;
 				this._hBassStream = -1;
 				this._hTempoStream = 0;
+				this.nBytes再生ハンドル = 0;
 				//-----------------
 				#endregion
 			}
@@ -1588,6 +1588,7 @@ namespace FDK
 															// tBASSサウンドを作成する・ストリーム生成後の共通処理()のタイミングと、
 															// 再生速度を変更したタイミングでのみ、
 															// hBassStreamを更新するようにした。
+															// (現在は n再生に使用するハンドル の値で固定であり、生成後に変わることはない。)
 															//{
 															//    get
 															//    {
@@ -1631,13 +1632,127 @@ namespace FDK
 		private int _n位置db;
 		private int _n音量 = 100;
 		private int _n音量db;
-		private long nBytes = 0;
+		private long nBytes = 0;                            // 元のストリームの長さ[byte]
+		private long nBytes再生ハンドル = 0;                // 実際に再生するハンドルの長さ[byte] (再生終了判定用)
 		private int n一時停止回数 = 0;
 		private int nオリジナルの周波数 = 0;
 		private double _db周波数倍率 = 1.0;
 		private double _db再生速度 = 1.0;
-		private bool bIs1倍速再生 = true;
 		private WaveFormat _Format;
+
+		#region [ 再生速度の実現方法 (TempoStreamか、周波数か) ]
+		//-----------------
+		/// <summary>
+		/// <para>再生(＝ミキサーへの登録)に使用するBASSハンドル。</para>
+		/// <para>TempoStreamを持っているなら、再生速度がx1.000であっても常にTempoStream。</para>
+		/// <para>#31076のように再生速度でハンドルを繋ぎ替えると、繋ぎ替え前のハンドルがミキサーに残ったまま</para>
+		/// <para>新しいハンドルも追加され、TempoStreamとそのデコード元が同じデータを奪い合って、</para>
+		/// <para>「速度を落としたのに曲が速くなる / x1.000に戻しても元の速度に戻らない」という症状になる。</para>
+		/// <para>TempoStreamはTimeStretch=ONのときは元々全サウンド分生成されているので、常時使っても</para>
+		/// <para>増えるのはミキシング時の処理だけ。</para>
+		/// </summary>
+		private int n再生に使用するハンドル
+		{
+			get { return CSoundPlaySpeedRouting.nPlaybackHandle(this._hBassStream, this._hTempoStream); }
+		}
+
+		/// <summary>
+		/// <para>再生速度をTempoStream(BASS_ATTRIB_TEMPO)で変更するかどうか。falseなら周波数で変更する。</para>
+		/// <para>CSoundManager.bIsTimeStretchはサウンド生成時にしか参照されないため、TimeStretchを</para>
+		/// <para>後からONにした場合、既存のサウンドにはTempoStreamが無い。その場合は周波数での変更に</para>
+		/// <para>フォールバックする。(でないとBASS_ATTRIB_TEMPOが無視され、再生速度が効かなくなる。)</para>
+		/// </summary>
+		private bool bTempoStreamで再生速度を変更する
+		{
+			get { return CSoundPlaySpeedRouting.bUseTempoStream(this._hTempoStream, CSoundManager.bIsTimeStretch); }
+		}
+
+		/// <summary>
+		/// 現在の再生速度と周波数倍率を、BASSのストリームに反映する。
+		/// </summary>
+		private void tBASS再生速度と周波数を適用する()
+		{
+			// eデバイス種別はストリーム生成の「後」に設定されるので、ここでbIsBASSは見られない。
+			// (BASS以外から呼ばれることはない。)
+			if (this.hBassStream == 0 || this.hBassStream == -1)
+				return;
+
+			bool bTempo = this.bTempoStreamで再生速度を変更する;
+			float f周波数 = CSoundPlaySpeedRouting.f周波数(_db周波数倍率, _db再生速度, nオリジナルの周波数, bTempo);
+
+			if (this._hTempoStream != 0)
+			{
+				// TempoStreamでは、周波数はBASS_ATTRIB_TEMPO_FREQで変更する。
+				// TimeStretchが後からOFFにされた場合は、テンポを原速に戻した上で周波数で速度を変える。
+				Bass.BASS_ChannelSetAttribute(this.hBassStream, BASSAttribute.BASS_ATTRIB_TEMPO,
+					bTempo ? CSoundPlaySpeedRouting.fTempoPercent(_db再生速度) : 0f);
+				Bass.BASS_ChannelSetAttribute(this.hBassStream, BASSAttribute.BASS_ATTRIB_TEMPO_FREQ, f周波数);
+			}
+			else
+			{
+				Bass.BASS_ChannelSetAttribute(this.hBassStream, BASSAttribute.BASS_ATTRIB_FREQ, f周波数);
+			}
+		}
+
+		/// <summary>
+		/// <para>再生に使用するハンドルを設定する。</para>
+		/// <para>既にミキサーに登録されているハンドルを別のハンドルに差し替える場合は、古いハンドルを</para>
+		/// <para>必ずミキサーから削除してから、新しいハンドルを同じ再生位置・同じ音量/PANで登録し直す。</para>
+		/// <para>(現在の実装ではハンドルは生成時から変わらないが、変わっても壊れないようにしておく。)</para>
+		/// </summary>
+		private void tBASS再生に使用するハンドルを設定する(int hNewStream)
+		{
+			if (hNewStream == this.hBassStream)
+				return;
+
+			int hOldStream = this.hBassStream;
+			if (hOldStream == 0 || hOldStream == -1 || BassMix.BASS_Mixer_ChannelGetMixer(hOldStream) == 0)
+			{
+				// まだどのミキサーにも登録されていないので、そのまま差し替えるだけでよい。
+				this.hBassStream = hNewStream;
+				tBASS再生ハンドル確定後の処理();
+				return;
+			}
+
+			Trace.TraceInformation("再生に使うストリームを差し替えます: " + Path.GetFileName(this.strファイル名) + " (" + hOldStream + " -> " + hNewStream + ")");
+
+			bool b再生中だった = (BassMix.BASS_Mixer_ChannelIsActive(hOldStream) == BASSActive.BASS_ACTIVE_PLAYING);
+			double db再生位置sec = Bass.BASS_ChannelBytes2Seconds(hOldStream, BassMix.BASS_Mixer_ChannelGetPosition(hOldStream));
+			int n音量 = this.nVolume;      // 音量とPANは、ミキサーに繋ぐハンドルごとに保持されている
+			int n位置 = this.nPosition;
+
+			tBASSサウンドをミキサーから削除する(hOldStream);
+
+			this.hBassStream = hNewStream;
+			tBASS再生ハンドル確定後の処理();
+			tBASSAddSoundToMixer();
+			if (db再生位置sec > 0.0)
+			{
+				BassMix.BASS_Mixer_ChannelSetPosition(hNewStream, Bass.BASS_ChannelSeconds2Bytes(hNewStream, db再生位置sec), BASSMode.BASS_POS_BYTES);
+			}
+			this.nVolume = n音量;
+			this.nPosition = n位置;
+			if (b再生中だった)
+			{
+				BassMix.BASS_Mixer_ChannelPlay(hNewStream);
+			}
+		}
+
+		/// <summary>
+		/// 再生に使用するハンドルが決まった(変わった)ときの処理。
+		/// </summary>
+		private void tBASS再生ハンドル確定後の処理()
+		{
+			// #32248 再生終了時に発火するcallbackは、実際にミキサーに繋ぐハンドルに登録する必要がある。
+			// (演奏終了後に再生終了するチップを非同期的にミキサーから削除するため。)
+			_cbEndofStream = new SYNCPROC(CallbackEndofStream);
+			Bass.BASS_ChannelSetSync(this.hBassStream, BASSSync.BASS_SYNC_END | BASSSync.BASS_SYNC_MIXTIME, 0, _cbEndofStream, IntPtr.Zero);
+
+			long n長さbyte = Bass.BASS_ChannelGetLength(this.hBassStream);
+			this.nBytes再生ハンドル = (n長さbyte > 0) ? n長さbyte : this.nBytes;
+		}
+		//-----------------
+		#endregion
 
 		private void tBASSサウンドを作成する(string strファイル名, int hMixer, BASSFlag flags)
 		{
@@ -1827,17 +1942,10 @@ namespace FDK
 				}
 			}
 
-			if (_hTempoStream != 0 && !this.bIs1倍速再生)   // 再生速度がx1.000のときは、TempoStreamを用いないようにして高速化する
-			{
-				this.hBassStream = _hTempoStream;
-			}
-			else
-			{
-				this.hBassStream = _hBassStream;
-			}
-			// #32248 再生終了時に発火するcallbackを登録する (演奏終了後に再生終了するチップを非同期的にミキサーから削除するため。)
-			_cbEndofStream = new SYNCPROC(CallbackEndofStream);
-			Bass.BASS_ChannelSetSync(hBassStream, BASSSync.BASS_SYNC_END | BASSSync.BASS_SYNC_MIXTIME, 0, _cbEndofStream, IntPtr.Zero);
+			// 再生に使うハンドルは、再生速度に関わらずTempoStreamの有無だけで決まる。
+			// (再生速度で繋ぎ替えると、ミキサーに両方のハンドルが残ってしまうため。n再生に使用するハンドル 参照。)
+			this.hBassStream = this.n再生に使用するハンドル;
+			tBASS再生ハンドル確定後の処理();
 
 			// インスタンスリストに登録。
 
@@ -1855,6 +1963,10 @@ namespace FDK
 				throw new Exception(string.Format("サウンドストリームの周波数取得に失敗しました。(BASS_ChannelGetAttribute)[{0}]", Bass.BASS_ErrorGetCode().ToString()));
 			}
 			this.nオリジナルの周波数 = (int)freq;
+
+			// サウンドデバイス変更時などの作り直しでは、CSoundのインスタンス(と再生速度・周波数倍率)は
+			// そのまま残り、ストリームだけが作り直される。作り直したストリームに現在の値を反映しておく。
+			tBASS再生速度と周波数を適用する();
 		}
 		//-----------------
 

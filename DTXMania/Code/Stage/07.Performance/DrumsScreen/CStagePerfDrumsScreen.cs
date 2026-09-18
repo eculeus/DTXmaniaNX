@@ -215,6 +215,9 @@ namespace DTXMania
                         tJumpInSongToBar(CDTXMania.DTXVmode.nStartBar + 1);
                     }
 
+                    // 練習モードで区間が選ばれているなら、その頭から始める。
+                    this.tPracticeLoop_OnPlayStart();
+
                     base.bJustStartedUpdate = false;
 
                     // display presence now that the initial timer reset has been performed
@@ -331,6 +334,11 @@ namespace DTXMania
                 if (!bNotationView) this.tUpdateAndDraw_JudgementLine();
                 if (!bNotationView) this.tUpdateAndDraw_DrumPad();
                 bIsFinishedFadeout = this.tUpdateAndDraw_FadeIn_Out();
+                // ループの折り返しは STAGE CLEAR の判定より先に見ること。区間の終わりが曲の終わりに近いと、
+                // 先に全チップを通過して bIsFinishedPlaying が立ち、演奏が終わってしまう。
+                if (this.tCheckLoopWrap())
+                    bIsFinishedPlaying = false;      // 巻き戻した以上、このフレームの「全チップ通過」は無効
+
                 if (bIsFinishedPlaying && (base.ePhaseID == CStage.EPhase.Common_DefaultState) )
                 {
                     if (CDTXMania.DTXVmode.Enabled)
@@ -466,26 +474,6 @@ namespace DTXMania
                             }
                         }
                     }
-                }
-
-                if (this.LoopEndMs != -1 && CSoundManager.rcPerformanceTimer.nCurrentTime > this.LoopEndMs)
-                {
-                    Trace.TraceInformation("Reached end of loop");
-                    this.tJumpInSong(this.LoopBeginMs == -1 ? 0 : this.LoopBeginMs);
-
-                    //Reset hit counts and scores, so that the displayed score reflects the looped part only
-                    this.nHitCount_ExclAuto.Drums.Perfect = 0;
-                    this.nHitCount_ExclAuto.Drums.Great = 0;
-                    this.nHitCount_ExclAuto.Drums.Good = 0;
-                    this.nHitCount_ExclAuto.Drums.Poor = 0;
-                    this.nHitCount_ExclAuto.Drums.Miss = 0;
-                    this.actCombo.nCurrentCombo.Drums = 0;
-                    this.actCombo.nCurrentCombo.HighestValue.Drums = 0;
-                    base.actScore.nCurrentTrueScore.Drums = 0;
-
-                    //
-                    this.nTimingHitCount.Drums.nLate = 0;
-                    this.nTimingHitCount.Drums.nEarly = 0;
                 }
 
                 // キー入力
@@ -3168,6 +3156,7 @@ namespace DTXMania
 		protected override bool bNotationView { get { return CDTXMania.ConfigIni.bDrumsNotationView; } }
 		protected override void tDrawNotationBeatLine( CChip pChip ) { this.actNotation.tDrawBeatLine( pChip ); }
 		protected override void tNotationLaneHit( CChip pChip ) { this.actNotation.tLaneHit( pChip.nChannelNumber ); }
+		protected override void tNotationJudge( CChip pChip, EJudgement eJudge ) { this.actNotation.tJudge( pChip, eJudge ); }
 
 		protected override void tUpdateAndDraw_Chip_Drums( CConfigIni configIni, ref CDTX dTX, ref CChip pChip )
 		{

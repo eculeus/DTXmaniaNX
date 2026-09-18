@@ -9,6 +9,72 @@ Builds are produced by GitHub Actions (`.github/workflows/build.yml`, Release x8
 extracting the zip over an existing DTXManiaNX folder; `Config.ini` is not included, so key
 bindings and settings are kept.
 
+## 1.5.0-beta.17 — 2026-09-18
+
+- **Play speed works again with TimeStretch ON** (WASAPI/ASIO). Changing the speed used to swap
+  the mixer channel from the raw stream to the pitch-preserving tempo stream without ever taking
+  the raw one out, so both were mixed at once, both pulled on the same decoder, and the song ran
+  roughly twice as fast instead of slower — and putting the speed back to x1.000 never recovered
+  it. A sound that has a tempo stream now plays through that tempo stream for its whole life,
+  x1.000 included (tempo 0%), so the mixer channel never changes identity. Should a handle ever
+  change again, it is now removed from the mixer and re-added at the same position, volume and
+  pan, and the end-of-stream callback follows it.
+- With TimeStretch ON, a sound loaded before the setting was switched on has no tempo stream; its
+  play speed used to be set on an attribute that stream cannot honour, and was silently ignored.
+  It now falls back to changing the frequency, as with TimeStretch OFF.
+- With TimeStretch ON, the random detune on a bad hit no longer re-applies the play speed as a
+  pitch shift on top of the tempo change.
+- The play speed and detune are re-applied after a sound device change, instead of being lost
+  with the rebuilt streams.
+- The routing rules behind all of that are checked in CI by a small offline harness
+  (`Tests/TimeStretchRouting`) that needs no sound device.
+
+- Notation view: a note takes the colour of its judgement as it is played and keeps it while it
+  is on screen, so the part of the staff already gone by reads as a report of how it went. The
+  head eases from its lane colour over to Perfect ice blue, Great sea green, Good gold, Poor
+  violet or Miss red over 180 ms (cubic ease out, on the clock, so the fade is the same at any
+  frame rate), and a missed head is boxed as well as reddened - the one cue that is not a colour.
+  A judged head is also drawn stronger than a plain played one (alpha 170, against 70 scrolling
+  and 102 on the page) since its colour is the thing being read. Works in both scroll and page
+  mode; the playhead, bar lines, beat ticks, legend and the rest of the HUD are untouched.
+- Notation view: the flash at the playhead takes the judgement's colour too, and a miss now
+  flashes where it used to flash nothing. In scroll mode the note itself is behind the legend
+  about a tenth of a second after the playhead, so the flash is what is actually read there.
+- Auto-played lanes are not judged and keep their lane colour, in both the head and the flash.
+- New setting `DrumsNotationJudgeColour` (CONFIG -> Drums -> NotationJudge), default ON.
+- Scroll mode: the playhead has moved from x=150 to x=400, so a note you have played stays on
+  screen to be looked at. At the SPEED 2.0 setting the staff moves 0.286 px per ms, so the old
+  40 px between the playhead and the legend gutter were 140 ms - and a miss is not decided until
+  117 ms after its note, which is why a miss used to be readable only as the flash. There are now
+  290 px of played staff, about half a 4/4 bar at 120 BPM or a full second of judged notes, and
+  1.5 bars (880 px, 3.1 s) of music still coming.
+- New setting `DrumsNotationPlayheadX` (Config.ini only, 120-900, like `DrumsNotationBarsPerLine`)
+  moves it: bigger for more history, smaller for more lookahead. Out of range or not a number
+  keeps the default. The chip lookahead, the judgement popup, the lane flash and the bar lines
+  all follow the playhead. Page mode is unaffected - it does not use this position at all.
+- A played chip used to be dropped a flat 65 px past the judgement line, which in the notation
+  view is 52 px: with the old playhead that was already inside the legend gutter, but at any
+  playhead further right the note would have blinked out in mid-staff. In the notation view a
+  chip is now kept until it reaches the gutter, which is also why the stage now clears when the
+  last note has left the staff rather than a fifth of a second after it passed the playhead.
+
+- **Practice loop mode.** `Config > Drums > PracticeMode` (`PracticeMode=` in `[PlayOption]`,
+  off by default). With it on, **Shift+F2** in song select opens a PRACTICE panel: pick a named
+  section of the song, or type a bar range and save it under a name, and the performance screen
+  plays only that range and loops it in place. `=` rewinds to the start of the range instead of
+  going back to the song-begin screen; seek and speed keys keep working and seeking is clamped
+  inside the range; the loop key clears the range if you want out. Combo, judgement counters,
+  score and gauge are folded back at each lap, so the numbers describe the lap you are on.
+  Nothing is scored or saved (no `score.ini`, no named high score, no rank), on the same
+  training-mode flag the existing seek and speed keys use.
+- A song folder can carry its structure in a `sections.def` next to `set.def` — named sections
+  in `.dtx` bar numbers, each loop starting one bar early for a run-up. Ranges you save
+  yourself live in `PracticeRanges.ini` next to the game, so re-downloading a song folder does
+  not wipe them. Format, bar-numbering convention and a worked example (a 6/4 song with 3/4
+  bars and six tempo changes inside one bar) are in `docs/practice-mode.md`.
+- The smoke test drives the new panel from song select and asserts the section's bar range
+  resolves to the right milliseconds and that the loop actually wraps.
+
 ## 1.5.0-beta.16 — 2026-09-14
 
 - Page mode: the playhead no longer runs past a line's closing bar line. Since the bar lines
