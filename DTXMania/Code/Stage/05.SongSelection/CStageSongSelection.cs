@@ -488,13 +488,19 @@ namespace DTXMania
                             return 0;
                         }
 						#endregion
-						#region [ Shift-F2: PRACTICE ]
+						#region [ "/" or Shift-F2: PRACTICE ]
 						// #24525 2011.3.16 yyagi: [SHIFT]+[F2]は廃止(将来発生するかもしれない別用途のためにキープ)
 						// ...その別用途がこれ。Config の PracticeMode が ON のときだけ、ループ区間を選ぶパネルを開く。
-						if ( CDTXMania.ConfigIni.bPracticeMode &&
-							( CDTXMania.InputManager.Keyboard.bKeyPressing( (int) SlimDXKey.RightShift ) || CDTXMania.InputManager.Keyboard.bKeyPressing( (int) SlimDXKey.LeftShift ) ) &&
-							CDTXMania.InputManager.Keyboard.bKeyPressed( (int) SlimDXKey.F2 ) )
-						{	// [SHIFT] + [F2] PRACTICE
+						// 普段使いは「/」。ただし「/」をパッドに割り当てている人がいるかもしれないので、
+						// 割り当てが無いときだけ受け付ける (Enter を Decide に使うときと同じ考え方)。
+						// Shift+F2 は割り当てに関係なく常に効く、確実な方の入口。
+						bool bPracticeKey =
+							( ( CDTXMania.InputManager.Keyboard.bKeyPressing( (int) SlimDXKey.RightShift ) || CDTXMania.InputManager.Keyboard.bKeyPressing( (int) SlimDXKey.LeftShift ) ) &&
+								CDTXMania.InputManager.Keyboard.bKeyPressed( (int) SlimDXKey.F2 ) )
+							|| ( CDTXMania.InputManager.Keyboard.bKeyPressed( (int) SlimDXKey.Slash ) &&
+								CDTXMania.ConfigIni.bキーがキー割り当てのどこにも使用されていない( (int) SlimDXKey.Slash ) );
+						if ( CDTXMania.ConfigIni.bPracticeMode && bPracticeKey )
+						{	// "/" (または [SHIFT] + [F2]) PRACTICE
 							CDTXMania.Skin.soundDecide.tPlay();
 							this.actPracticePanel.tActivatePopupMenu();
 							return 0;
@@ -904,7 +910,7 @@ namespace DTXMania
 
 		private CActSortSongs actSortSongs;
 		private CActSelectQuickConfig actQuickConfig;
-		private CActSelectPracticePanel actPracticePanel;  // 練習モードのループ区間選び (Shift+F2)
+		private CActSelectPracticePanel actPracticePanel;  // 練習モードのループ区間選び ("/" または Shift+F2)
 
 		//
 		private CActTextBox actTextBox;

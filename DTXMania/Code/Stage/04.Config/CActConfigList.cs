@@ -750,10 +750,10 @@ namespace DTXMania
             this.listItems.Add(this.iDrumsNotationJudge);
             this.iDrumsPracticeMode = new CItemToggle("PracticeMode", CDTXMania.ConfigIni.bPracticeMode,
                 "ONにすると選曲画面で\n" +
-                "Shift+F2 からループ区間を\n" +
+                "「/」からループ区間を\n" +
                 "選べるようになります。\n" +
                 "この演奏は記録されません。",
-                "Practice loop. Turn ON and song select lets you pick a section of the song with Shift+F2; " +
+                "Practice loop. Turn ON and song select lets you pick a section of the song with \"/\" (or Shift+F2); " +
                 "the performance screen then loops that section instead of playing the whole chart, and '=' rewinds " +
                 "to the start of the loop instead of restarting the song. Nothing is scored or saved while a loop is set.");
             this.listItems.Add(this.iDrumsPracticeMode);
