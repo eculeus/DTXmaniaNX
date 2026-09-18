@@ -563,6 +563,7 @@ jobs:
           $VK_RETURN = 0x0D
           $VK_DOWN   = 0x28
           $VK_F2     = 0x71
+          $VK_EQUALS = 0xBB      # the Restart key, "=" by default
 
           Write-Host "Launching (practice loop): $exe   DTXPath=$songDir"
           $proc = Start-Process -FilePath $exe -WorkingDirectory $game -PassThru
@@ -618,11 +619,20 @@ jobs:
             [Drive2]::Tap([byte]$VK_RETURN, 80)
 
             # ~50 s of play: the loop is about 8.7 s long, so this should wrap several times.
+            # Half way through, press the Restart key: in practice mode that must rewind to the
+            # start of the range and stay on the performance screen, not drop back to song loading.
             for ($i = 1; $i -le 25; $i++) {
               Start-Sleep -Seconds 2
               $proc.Refresh()
               if ($proc.HasExited) { Write-Host "!! exited during play after $($i * 2)s code $($proc.ExitCode)"; break }
               Focus-Game
+              if ($i -eq 13) {
+                Write-Host "pressing '=' (Restart) mid-loop"
+                [Drive2]::Tap([byte]$VK_EQUALS, 80)
+                Start-Sleep -Milliseconds 700
+                Focus-Game
+                Snap 'after_restart'
+              }
               if (($i % 5) -eq 0) { Snap ("play{0:D2}" -f $i) }
             }
           }
@@ -663,6 +673,15 @@ jobs:
           $wraps = ([regex]::Matches($log, 'Reached end of loop')).Count
           Write-Host "loop wrapped $wraps time(s)"
           if ($wraps -lt 2) { throw "the loop wrapped $wraps time(s); expected at least 2 in 50 s of a 8.7 s loop" }
+
+          # The Restart key must rewind inside the range...
+          if ($log -notmatch 'PRACTICE: rewind to 4000ms') {
+            throw "'=' did not rewind to the start of the range - see DTXManiaLog_practice.txt"
+          }
+          # ...and must NOT have taken the song back through the loading screen.
+          $loads = ([regex]::Matches($log, 'SongLoading')).Count
+          Write-Host "song loading screen entered $loads time(s) (expected exactly 1)"
+          if ($loads -ne 1) { throw "'=' restarted the song instead of rewinding the loop ($loads loads)" }
           if ($frames.Count -lt 10) { throw "the practice run rendered $($frames.Count) frame(s)" }
 
       - name: Show DTXManiaLog.txt
