@@ -9,6 +9,25 @@ Builds are produced by GitHub Actions (`.github/workflows/build.yml`, Release x8
 extracting the zip over an existing DTXManiaNX folder; `Config.ini` is not included, so key
 bindings and settings are kept.
 
+## Unreleased
+
+- **Practice loop mode.** `Config > Drums > PracticeMode` (`PracticeMode=` in `[PlayOption]`,
+  off by default). With it on, **Shift+F2** in song select opens a PRACTICE panel: pick a named
+  section of the song, or type a bar range and save it under a name, and the performance screen
+  plays only that range and loops it in place. `=` rewinds to the start of the range instead of
+  going back to the song-begin screen; seek and speed keys keep working and seeking is clamped
+  inside the range; the loop key clears the range if you want out. Combo, judgement counters,
+  score and gauge are folded back at each lap, so the numbers describe the lap you are on.
+  Nothing is scored or saved (no `score.ini`, no named high score, no rank), on the same
+  training-mode flag the existing seek and speed keys use.
+- A song folder can carry its structure in a `sections.def` next to `set.def` — named sections
+  in `.dtx` bar numbers, each loop starting one bar early for a run-up. Ranges you save
+  yourself live in `PracticeRanges.ini` next to the game, so re-downloading a song folder does
+  not wipe them. Format, bar-numbering convention and a worked example (a 6/4 song with 3/4
+  bars and six tempo changes inside one bar) are in `docs/practice-mode.md`.
+- The smoke test drives the new panel from song select and asserts the section's bar range
+  resolves to the right milliseconds and that the loop actually wraps.
+
 ## 1.5.0-beta.16 — 2026-09-14
 
 - Page mode: the playhead no longer runs past a line's closing bar line. Since the bar lines

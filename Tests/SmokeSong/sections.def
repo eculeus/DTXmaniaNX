@@ -1,0 +1,19 @@
+; Practice sections for the CI smoke chart. Read by CActSelectPracticePanel in song select.
+; Bar numbers are .dtx file bar numbers (the nnn in "#nnn13:"), end exclusive.
+;
+; The smoke chart is deliberately awkward so these exercise the bar -> ms conversion:
+; bar 001 is 1/4 (#00102: 0.25), bar 003 is 3/4 (#00302: 0.75) and the tempo drops from
+; 120 to 90 at bar 005 (#00508). Plus DTXMania's own empty bar in front of bar 000.
+;
+; "Verse" below therefore resolves to 4000 ms -> 12666 ms with the one-bar lead applied
+; (empty bar 2000 + bar000 2000 = 4000 for the lead bar 001; bars 002..005 end at 12666).
+; The smoke job asserts those numbers, so do not renumber without updating build.yml.
+
+#VERSION: 1
+#BARBASE: DTX
+#LEADBARS: 1
+
+#SECTION: 002,006,Verse
+#SECTION: 006,012,Chorus
+#SECTION: 012,020,Bridge
+#SECTION: 020,033,Outro
