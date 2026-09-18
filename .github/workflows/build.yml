@@ -25,6 +25,20 @@ jobs:
       - name: Build (Release, x86)
         run: msbuild DTXMania.sln /m /p:Configuration=Release /p:Platform=x86 /verbosity:minimal
 
+      # The play-speed routing rules decide which BASS handle the mixer sees for a time-stretched
+      # sound. They are deliberately free of any BASS dependency so they can be checked here: this
+      # runner has no audio endpoint at all, so nothing else about sound can be.
+      - name: Play-speed routing checks (no sound device needed)
+        shell: pwsh
+        run: |
+          $csc = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
+          if (-not (Test-Path $csc)) { throw "csc.exe not found at $csc" }
+          $exe = Join-Path $env:RUNNER_TEMP 'routing.exe'
+          & $csc /nologo /langversion:5 "/out:$exe" Tests\TimeStretchRouting\RoutingTests.cs FDK\Code\03.Sound\CSoundPlaySpeedRouting.cs
+          if ($LASTEXITCODE -ne 0) { throw "the routing harness did not compile" }
+          & $exe
+          if ($LASTEXITCODE -ne 0) { throw "routing checks FAILED" }
+
       - name: Package runtime
         shell: pwsh
         run: |
