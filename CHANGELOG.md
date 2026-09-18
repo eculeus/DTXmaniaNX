@@ -24,6 +24,21 @@ bindings and settings are kept.
   about a tenth of a second after the playhead, so the flash is what is actually read there.
 - Auto-played lanes are not judged and keep their lane colour, in both the head and the flash.
 - New setting `DrumsNotationJudgeColour` (CONFIG -> Drums -> NotationJudge), default ON.
+- Scroll mode: the playhead has moved from x=150 to x=400, so a note you have played stays on
+  screen to be looked at. At the SPEED 2.0 setting the staff moves 0.286 px per ms, so the old
+  40 px between the playhead and the legend gutter were 140 ms - and a miss is not decided until
+  117 ms after its note, which is why a miss used to be readable only as the flash. There are now
+  290 px of played staff, about half a 4/4 bar at 120 BPM or a full second of judged notes, and
+  1.5 bars (880 px, 3.1 s) of music still coming.
+- New setting `DrumsNotationPlayheadX` (Config.ini only, 120-900, like `DrumsNotationBarsPerLine`)
+  moves it: bigger for more history, smaller for more lookahead. Out of range or not a number
+  keeps the default. The chip lookahead, the judgement popup, the lane flash and the bar lines
+  all follow the playhead. Page mode is unaffected - it does not use this position at all.
+- A played chip used to be dropped a flat 65 px past the judgement line, which in the notation
+  view is 52 px: with the old playhead that was already inside the legend gutter, but at any
+  playhead further right the note would have blinked out in mid-staff. In the notation view a
+  chip is now kept until it reaches the gutter, which is also why the stage now clears when the
+  last note has left the staff rather than a fifth of a second after it passed the playhead.
 
 - **Practice loop mode.** `Config > Drums > PracticeMode` (`PracticeMode=` in `[PlayOption]`,
   off by default). With it on, **Shift+F2** in song select opens a PRACTICE panel: pick a named

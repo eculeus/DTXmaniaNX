@@ -2921,14 +2921,14 @@ namespace DTXMania
                 }
                 //				if ( ( ( nCurrentTopChip == this.nCurrentTopChip ) && ( pChip.nDistanceFromBar.Drums < -65 ) ) && pChip.bHit )
                 // #28026 2012.4.5 yyagi; 信心ワールドエンドの曲終了後リザルトになかなか行かない問題の修正
-                if ((dTX.listChip[this.nCurrentTopChip].nDistanceFromBar.Drums < -65) && dTX.listChip[this.nCurrentTopChip].bHit)
+                if ((dTX.listChip[this.nCurrentTopChip].nDistanceFromBar.Drums < -nChipTrailPx) && dTX.listChip[this.nCurrentTopChip].bHit)
                 {
                     //					nCurrentTopChip = ++this.nCurrentTopChip;
 
                     if (dTX.listChip[this.nCurrentTopChip].bロングノートである)
                     {
                         CChip chipロングノート終端 = dTX.listChip[this.nCurrentTopChip].chipロングノート終端;
-                        if (chipロングノート終端.bHit && chipロングノート終端.nDistanceFromBar.Drums < -65)
+                        if (chipロングノート終端.bHit && chipロングノート終端.nDistanceFromBar.Drums < -nChipTrailPx)
                         {
                             this.nCurrentTopChip++;
                             continue;
@@ -3574,13 +3574,13 @@ namespace DTXMania
                 }
                 //				if ( ( ( nCurrentTopChip == this.nCurrentTopChip ) && ( pChip.nDistanceFromBar.Drums < -65 ) ) && pChip.bHit )
                 // #28026 2012.4.5 yyagi; 信心ワールドエンドの曲終了後リザルトになかなか行かない問題の修正
-                if ((dTX.listChip[this.nCurrentTopChip].nDistanceFromBar.Drums < -65) && dTX.listChip[this.nCurrentTopChip].bHit)
+                if ((dTX.listChip[this.nCurrentTopChip].nDistanceFromBar.Drums < -nChipTrailPx) && dTX.listChip[this.nCurrentTopChip].bHit)
                 {
                     //					nCurrentTopChip = ++this.nCurrentTopChip;
                     if (dTX.listChip[this.nCurrentTopChip].bロングノートである)
                     {
                         CChip chipロングノート終端 = dTX.listChip[this.nCurrentTopChip].chipロングノート終端;
-                        if (chipロングノート終端.bHit && chipロングノート終端.nDistanceFromBar.Drums < -65)
+                        if (chipロングノート終端.bHit && chipロングノート終端.nDistanceFromBar.Drums < -nChipTrailPx)
                         {
                             this.nCurrentTopChip++;
                             continue;
@@ -3695,7 +3695,7 @@ namespace DTXMania
                 }
                 //				if ( ( ( nCurrentTopChip == this.nCurrentTopChip ) && ( pChip.nDistanceFromBar.Drums < -65 ) ) && pChip.bHit )
                 // #28026 2012.4.5 yyagi; 信心ワールドエンドの曲終了後リザルトになかなか行かない問題の修正
-                if ((dTX.listChip[this.nCurrentTopChip].nDistanceFromBar.Drums < -65) && dTX.listChip[this.nCurrentTopChip].bHit)
+                if ((dTX.listChip[this.nCurrentTopChip].nDistanceFromBar.Drums < -nChipTrailPx) && dTX.listChip[this.nCurrentTopChip].bHit)
                 {
                     //					nCurrentTopChip = ++this.nCurrentTopChip;                    
                     //if (dTX.listChip[this.nCurrentTopChip].bロングノートである)
@@ -3710,7 +3710,7 @@ namespace DTXMania
                     if (dTX.listChip[this.nCurrentTopChip].bロングノートである)
                     {
                         CChip chipロングノート終端 = dTX.listChip[this.nCurrentTopChip].chipロングノート終端;
-                        if (chipロングノート終端.bHit && chipロングノート終端.nDistanceFromBar.Drums < -65)
+                        if (chipロングノート終端.bHit && chipロングノート終端.nDistanceFromBar.Drums < -nChipTrailPx)
                         {
                             this.nCurrentTopChip++;
                             continue;
@@ -4672,6 +4672,10 @@ namespace DTXMania
         /// <summary>How far ahead (in vertical-lane px) chips are fed to the drawing code. The
         /// notation view spreads them over a much smaller horizontal scale, so it needs more.</summary>
         protected int nChipLookaheadPx { get { return bNotationView ? CActPerfDrumsNotation.LOOKAHEAD_PX : 600; } }
+        /// <summary>How far behind (in vertical-lane px) a chip that has been played is kept before it is
+        /// retired. The notation view draws the staff you have already played, so it needs them until they
+        /// reach its legend gutter; every other view is done with a chip 65 px past the judgement line.</summary>
+        protected int nChipTrailPx { get { return bNotationView ? CActPerfDrumsNotation.TRAIL_PX : 65; } }
         protected virtual void tDrawNotationBeatLine(CChip pChip) { }
         protected abstract void tDraw_LoopLine(CConfigIni configIni, bool bIsEnd);
         //protected abstract void t進行描画_チップ_ベース( CConfigIni configIni, ref CDTX dTX, ref CChip pChip );
