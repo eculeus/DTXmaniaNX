@@ -39,7 +39,8 @@ namespace FDK
 		/// 描画色を乗算する（白いテクスチャを任意の色で描ける）。
 		/// A diffuse tint the texture is modulated by, so one white sprite can be drawn in any
 		/// colour. White (the default) leaves the texture exactly as it is; alpha is nTransparency
-		/// as before.
+		/// as before. (The vertex colour is packed with ToBgra(): every draw here was white until
+		/// this went in, so the red and blue ToRgba() swaps had never shown up.)
 		/// </summary>
 		public void tSetTint( float fRed, float fGreen, float fBlue )
 		{
@@ -431,7 +432,7 @@ namespace FDK
 				float f上V値 = ( (float) rc画像内の描画領域.Top ) / ( (float) this.szTextureSize.Height );
 				float f下V値 = ( (float) rc画像内の描画領域.Bottom ) / ( (float) this.szTextureSize.Height );
 				this.color4.Alpha = ( (float) this._Transparency ) / 255f;
-				int color = this.color4.ToRgba();
+				int color = this.color4.ToBgra();   // D3DCOLOR is 0xAARRGGBB; ToRgba() would swap red and blue
 
 				if( this.cvTransformedColoredVertexies == null )
 					this.cvTransformedColoredVertexies = new TransformedColoredTexturedVertex[ 4 ];
@@ -489,7 +490,7 @@ namespace FDK
 				float f上V値 = ( (float) rc画像内の描画領域.Top ) / ( (float) this.szTextureSize.Height );
 				float f下V値 = ( (float) rc画像内の描画領域.Bottom ) / ( (float) this.szTextureSize.Height );
 				this.color4.Alpha = ( (float) this._Transparency ) / 255f;
-				int color = this.color4.ToRgba();
+				int color = this.color4.ToBgra();   // D3DCOLOR is 0xAARRGGBB; ToRgba() would swap red and blue
 
 				if( this.cvPositionColoredVertexies == null )
 					this.cvPositionColoredVertexies = new PositionColoredTexturedVertex[ 4 ];
@@ -564,7 +565,7 @@ namespace FDK
 			float f上V値 = ( (float) rc画像内の描画領域.Top ) / ( (float) this.szTextureSize.Height );
 			float f下V値 = ( (float) rc画像内の描画領域.Bottom ) / ( (float) this.szTextureSize.Height );
 			this.color4.Alpha = ( (float) this._Transparency ) / 255f;
-			int color = this.color4.ToRgba();
+			int color = this.color4.ToBgra();   // D3DCOLOR is 0xAARRGGBB; ToRgba() would swap red and blue
 
             if( this.cvTransformedColoredVertexies == null )
 			    this.cvTransformedColoredVertexies = new TransformedColoredTexturedVertex[ 4 ];
@@ -628,7 +629,7 @@ namespace FDK
 			float f上V値 = ( (float) rc画像内の描画領域.Top ) / ( (float) this.szTextureSize.Height );
 			float f下V値 = ( (float) rc画像内の描画領域.Bottom ) / ( (float) this.szTextureSize.Height );
 			this.color4.Alpha = ( (float) this._Transparency ) / 255f;
-			int color = this.color4.ToRgba();
+			int color = this.color4.ToBgra();   // D3DCOLOR is 0xAARRGGBB; ToRgba() would swap red and blue
 			
 			if( this.cvPositionColoredVertexies == null )
 				this.cvPositionColoredVertexies = new PositionColoredTexturedVertex[ 4 ];
@@ -695,7 +696,7 @@ namespace FDK
 			float f上V値 = ( (float) rc画像内の描画領域.Top ) / ( (float) this.szTextureSize.Height );
 			float f下V値 = ( (float) rc画像内の描画領域.Bottom ) / ( (float) this.szTextureSize.Height );
 			this.color4.Alpha = ( (float) this._Transparency ) / 255f;
-			int color = this.color4.ToRgba();
+			int color = this.color4.ToBgra();   // D3DCOLOR is 0xAARRGGBB; ToRgba() would swap red and blue
 			
 			if( this.cvPositionColoredVertexies == null )
 				this.cvPositionColoredVertexies = new PositionColoredTexturedVertex[ 4 ];

@@ -156,8 +156,9 @@ namespace DTXMania
         private const int JUDGE_ALPHA = 150;        // a judged head is drawn stronger than a plain
                                                     // played one (70 scrolling, 102 on the page):
                                                     // its colour is the thing being read
-        private const int MISS_BOX_PAD = 4;         // a missed head is boxed as well as reddened,
-        private const int MISS_BOX_H = 3;           // so it is told apart without relying on colour
+        private const int MISS_BOX_PAD = 7;         // a missed head is boxed as well as reddened, so
+        private const int MISS_BOX_H = 3;           // it is told apart without relying on colour; the
+                                                    // pad keeps the box off the head it is around
         private const int POS_MIN = -1;             // lowest staff position any voice uses (left pedal)
         private const int POS_MAX = 12;             // highest (left crash on its second ledger line)
 
