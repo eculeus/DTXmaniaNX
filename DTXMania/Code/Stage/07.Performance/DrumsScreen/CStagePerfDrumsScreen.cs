@@ -336,7 +336,8 @@ namespace DTXMania
                 bIsFinishedFadeout = this.tUpdateAndDraw_FadeIn_Out();
                 // ループの折り返しは STAGE CLEAR の判定より先に見ること。区間の終わりが曲の終わりに近いと、
                 // 先に全チップを通過して bIsFinishedPlaying が立ち、演奏が終わってしまう。
-                this.tCheckLoopWrap();
+                if (this.tCheckLoopWrap())
+                    bIsFinishedPlaying = false;      // 巻き戻した以上、このフレームの「全チップ通過」は無効
 
                 if (bIsFinishedPlaying && (base.ePhaseID == CStage.EPhase.Common_DefaultState) )
                 {

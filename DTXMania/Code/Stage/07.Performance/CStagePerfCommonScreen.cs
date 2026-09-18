@@ -5733,15 +5733,18 @@ namespace DTXMania
         /// <para>ループの終端まで来ていたら頭に戻す。演奏画面から毎フレーム、しかも
         /// STAGE CLEAR の判定より先に呼ぶこと。区間の終わりが曲の終わりに近いと、
         /// 先に全チップを通過して演奏終了になってしまうため。</para>
+        /// <para>戻り値が true のときは、同じフレームで立っている「全チップ通過」の判定は
+        /// 捨てること。ループで巻き戻した以上、演奏は終わっていない。</para>
         /// </summary>
-        protected void tCheckLoopWrap()
+        protected bool tCheckLoopWrap()
         {
             if ((this.LoopEndMs == -1) || (CSoundManager.rcPerformanceTimer.nCurrentTime <= this.LoopEndMs))
-                return;
+                return false;
 
             Trace.TraceInformation("Reached end of loop");
             this.tJumpInSong((this.LoopBeginMs == -1) ? 0 : this.LoopBeginMs);
             this.tResetCountersForLoop();
+            return true;
         }
 
         /// <summary>

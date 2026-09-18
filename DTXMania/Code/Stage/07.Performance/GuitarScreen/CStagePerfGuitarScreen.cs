@@ -219,7 +219,8 @@ namespace DTXMania
 				this.tUpdateAndDraw_STAGEFAILED();
                 bIsFinishedFadeout = this.tUpdateAndDraw_FadeIn_Out();
                 // ループの折り返しは STAGE CLEAR の判定より先に見ること。
-                this.tCheckLoopWrap();
+                if ( this.tCheckLoopWrap() )
+                    bIsFinishedPlaying = false;      // 巻き戻した以上、このフレームの「全チップ通過」は無効
 
                 if ( bIsFinishedPlaying && (base.ePhaseID == CStage.EPhase.Common_DefaultState ) )
                 {
