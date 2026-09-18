@@ -26,9 +26,30 @@ namespace DTXMania
         //  vertical-lane mode and is pushed to PANEL_Y here), so nothing      //
         //  overlaps the staff.  Tune these from a screenshot if needed.       //
         // ------------------------------------------------------------------ //
-        public const int PLAYHEAD_X = 150;                          // notes are hit when they reach this x:
-                                                                    // right after the legend, so nearly the whole
-                                                                    // band is upcoming music
+        // Scroll mode: the x notes are hit at. Left of it is what has already been played - a judged
+        // head keeps its judgement colour until it reaches the legend gutter, so nPlayheadX minus
+        // LABEL_GUTTER_W is how much history there is to look back at; right of it is the music
+        // coming. At the SPEED 2.0 setting one screen px is 3.50 ms (see X_SCALE) and a 4/4 bar at
+        // 120 BPM is 572 px wide, so the default leaves 400-110 = 290 px = about half a bar, a full
+        // second, of judged notes standing - a miss is not even decided until 117 ms (33 px) after
+        // its note - and still 880 px = 1.5 bars, 3.1 s, of lookahead. Config.ini
+        // DrumsNotationPlayheadX (ini only) moves it; page mode does not use it at all.
+        public const int PLAYHEAD_X_DEFAULT = 400;
+        public const int PLAYHEAD_X_MIN = 120;                      // 10 px of history: as good as none, but
+                                                                    // it is the player's screen
+        public const int PLAYHEAD_X_MAX = 900;                      // beyond this there is no lookahead left
+        /// <summary>Where the scroll-mode playhead sits this song, clamped to something sane.</summary>
+        public static int nPlayheadX
+        {
+            get
+            {
+                if (CDTXMania.ConfigIni == null) return PLAYHEAD_X_DEFAULT;
+                int x = CDTXMania.ConfigIni.nDrumsNotationPlayheadX;
+                if (x < PLAYHEAD_X_MIN) return PLAYHEAD_X_MIN;
+                if (x > PLAYHEAD_X_MAX) return PLAYHEAD_X_MAX;
+                return x;
+            }
+        }
         public const int STAFF_SPACE = 36;                          // px between two staff lines
         public const int STAFF_STEP = STAFF_SPACE / 2;              // one staff position (line -> space) = 18
         public const int STAFF_BOTTOM_Y = 380;                      // y of the bottom line
@@ -40,15 +61,30 @@ namespace DTXMania
         public const int STEM_BOTTOM_Y = STAFF_BOTTOM_Y + 80;       // 460: every down-stem ends here
         public const int BAR_NUMBER_Y = 4;                          // bar number text, along the band top
         public const double X_SCALE = 0.80;                         // horizontal px per vertical-lane px.
-                                                                    // The engine gives us (SPEED * 0.3575) lane px
-                                                                    // per ms, so at the SPEED 2.0 setting this shows
-                                                                    // 1130/(0.80*0.3575) = 3950 ms ahead, about two
-                                                                    // bars of 4/4 at 120 BPM, with eighths 72 px
-                                                                    // apart. The in-game SPEED setting still scales
-                                                                    // it: SPEED 1.0 shows twice as much, 4.0 half.
-        public const int LOOKAHEAD_PX = 1600;                       // the chip loop normally stops feeding us chips
-                                                                    // past 600 lane px, which at this X_SCALE would
-                                                                    // leave the right half of the band empty
+                                                                    // The engine gives the drums (SPEED * 0.17875)
+                                                                    // lane px per ms, so at the SPEED 2.0 setting the
+                                                                    // staff moves 0.286 screen px per ms: one px is
+                                                                    // 3.50 ms, a 4/4 bar at 120 BPM is 572 px and its
+                                                                    // eighths are 72 px apart. The in-game SPEED
+                                                                    // setting still scales it: SPEED 1.0 shows twice
+                                                                    // as much, 4.0 half.
+        public const int LOOKAHEAD_MARGIN_PX = 200;                 // fed this far past the right edge, so a chip
+                                                                    // is never seen appearing out of nothing
+        public const int PAGE_LOOKAHEAD_PX = 1600;                  // page mode does not scroll: it keeps the flat
+                                                                    // figure the scroll view used to have
+        /// <summary>
+        /// How far ahead (in vertical-lane px) the chip loop has to feed us: exactly the band right of
+        /// the playhead, which shrinks as the playhead moves right, plus a margin. The loop normally
+        /// stops at 600 lane px, which at this X_SCALE would leave most of the band empty.
+        /// </summary>
+        public static int LOOKAHEAD_PX
+        {
+            get
+            {
+                if (bPage) return PAGE_LOOKAHEAD_PX;
+                return (int)((1280 - nPlayheadX) / X_SCALE) + LOOKAHEAD_MARGIN_PX;
+            }
+        }
 
         // Where the rest of the drums HUD goes while the notation band owns the top 65% of the screen.
         // All of these are only used when ConfigIni.bDrumsNotationView is on.
@@ -105,12 +141,13 @@ namespace DTXMania
         public const int PAGE_SWAP_LEAD_MS = 300;                   // a staff has finished fading its next line in
                                                                     // at least this long before that line is played
 
-        public const int JUDGE_X = PLAYHEAD_X;                      // judgement popup anchor in scroll mode
+        // (the popup is anchored on the playhead itself, through nJudgeX below)
         public const int JUDGE_GAP = 12;                            // its right edge sits this far left of the
                                                                     // playhead, in the region already played
         public const int JUDGE_RISE = 26;                           // its bottom edge sits this far over the head
         public const float JUDGE_SCALE = 0.9f;                      // nearly stock size; it is clamped to x >= 2,
-                                                                    // so it may overlap the legend gutter
+                                                                    // so a playhead set close to the legend puts it
+                                                                    // over the gutter
 
         // Sizes derived from the staff spacing (36 px).
         private const int HEAD_W = 48;              // round notehead cell -> 38 x 29 px head (1.05 x 0.8 spaces)
@@ -192,12 +229,12 @@ namespace DTXMania
         private int nStep = STAFF_STEP;             // half of it, one staff position
         private int nStemTopY = STEM_TOP_Y;         // beam line
         private int nStemBotY = STEM_BOTTOM_Y;
-        private int nHeadX = PLAYHEAD_X;            // where the playhead is right now
+        private int nHeadX = PLAYHEAD_X_DEFAULT;    // where the playhead is right now (set every frame)
 
         // The judgement string and the lane flash need these from outside, once per frame.
         private static int nActiveBaseY = STAFF_BOTTOM_Y;
         private static int nActiveStep = STAFF_STEP;
-        private static int nActiveJudgeX = JUDGE_X;
+        private static int nActiveJudgeX = PLAYHEAD_X_DEFAULT;
 
         /// <summary>Point the layout at one staff system.</summary>
         private void tSetSystem(int nBottomY, int nSpacing, int nStemTop, int nStemBottom)
@@ -508,7 +545,7 @@ namespace DTXMania
         /// <summary>Screen x for a chip given its (vertical-lane) distance from the judgement line.</summary>
         public int nX(int nDistanceFromBar)
         {
-            return PLAYHEAD_X + (int)(nDistanceFromBar * X_SCALE);
+            return nPlayheadX + (int)(nDistanceFromBar * X_SCALE);
         }
 
         /// <summary>Dark band, hit flashes, five staff lines and the playhead. Call before the chip loop.</summary>
@@ -518,10 +555,10 @@ namespace DTXMania
             if (this.tx == null) return;
             if (bPage) { tDrawPage(); return; }
             tSetSystem(STAFF_BOTTOM_Y, STAFF_SPACE, STEM_TOP_Y, STEM_BOTTOM_Y);
-            this.nHeadX = PLAYHEAD_X;
+            this.nHeadX = nPlayheadX;
             nActiveBaseY = STAFF_BOTTOM_Y;
             nActiveStep = STAFF_STEP;
-            nActiveJudgeX = JUDGE_X;
+            nActiveJudgeX = this.nHeadX;
             tDrawCell(SHAPE_SOLID, C_DARK, 0, BAND_TOP_Y, 1280, BAND_BOTTOM_Y - BAND_TOP_Y, 200);
             tDrawCell(SHAPE_SOLID, C_DARK, 0, BAND_TOP_Y, LABEL_GUTTER_W, BAND_BOTTOM_Y - BAND_TOP_Y, 190);
             tDrawLaneFlashes();
@@ -529,7 +566,7 @@ namespace DTXMania
             for (int i = 0; i < 5; i++)
                 tDrawCell(SHAPE_SOLID, C_WHITE, LABEL_GUTTER_W, STAFF_BOTTOM_Y - i * STAFF_SPACE - LINE_H / 2,
                           1280 - LABEL_GUTTER_W, LINE_H, 235);
-            tDrawCell(SHAPE_SOLID, C_PLAYHEAD, PLAYHEAD_X - 2, BAND_TOP_Y + 8, 4, BAND_BOTTOM_Y - BAND_TOP_Y - 16, 255);
+            tDrawCell(SHAPE_SOLID, C_PLAYHEAD, this.nHeadX - 2, BAND_TOP_Y + 8, 4, BAND_BOTTOM_Y - BAND_TOP_Y - 16, 255);
         }
 
         #region [ page view: two fixed staves, the playhead sweeping them in turn ]

@@ -679,6 +679,7 @@ namespace DTXMania
 		public bool bDrumsNotationStems;  // ...with note stems and beams (off: noteheads only)
 		public bool bDrumsNotationJudgeColour;  // ...and a judged note takes the colour of its judgement
 		public int nDrumsNotationBarsPerLine;   // page view: bars per staff line (ini only, 1-8)
+		public int nDrumsNotationPlayheadX;      // scroll view: playhead x in px (ini only, 120-900)
 		public bool bPracticeMode;        // practice loop: song select offers a loop range; nothing is scored
 		public bool bScoreIniを出力する;
 		public bool bSTAGEFAILEDEnabled;
@@ -1402,6 +1403,7 @@ namespace DTXMania
 			this.bDrumsNotationStems = true;
 			this.bDrumsNotationJudgeColour = true;
 			this.nDrumsNotationBarsPerLine = 4;
+			this.nDrumsNotationPlayheadX = CActPerfDrumsNotation.PLAYHEAD_X_DEFAULT;
 			this.bPracticeMode = false;
 			this.eRandom = new STDGBVALUE<ERandomMode>();
 			this.bLight = new STDGBVALUE<bool>();
@@ -2078,6 +2080,10 @@ namespace DTXMania
 			sw.WriteLine( "DrumsNotationJudgeColour={0}", this.bDrumsNotationJudgeColour ? 1 : 0 );
 			sw.WriteLine( "; Drums notation page view: how many bars fit on one staff line (1-8)" );
 			sw.WriteLine( "DrumsNotationBarsPerLine={0}", this.nDrumsNotationBarsPerLine );
+			sw.WriteLine( "; Drums notation scroll view: x of the playhead, in px of the 1280 wide screen (120-900)." );
+			sw.WriteLine( "; Left of it is what you have already played, still coloured by its judgement; right of it" );
+			sw.WriteLine( "; is the music coming. Bigger = more history to look back at, less lookahead." );
+			sw.WriteLine( "DrumsNotationPlayheadX={0}", this.nDrumsNotationPlayheadX );
 			sw.WriteLine();
 			sw.WriteLine( "; Practice loop mode: 1 = song select offers a loop range (Shift+F2) and the run is not scored" );
 			sw.WriteLine( "PracticeMode={0}", this.bPracticeMode ? 1 : 0 );
@@ -3290,6 +3296,12 @@ namespace DTXMania
 											else if ( str3.Equals( "DrumsNotationBarsPerLine" ) )
 											{
 												this.nDrumsNotationBarsPerLine = CConversion.nGetNumberIfInRange( str4, 1, 8, this.nDrumsNotationBarsPerLine );
+											}
+											else if ( str3.Equals( "DrumsNotationPlayheadX" ) )
+											{
+												// out of range, or not a number at all, keeps the default: a silly value costs nothing
+												this.nDrumsNotationPlayheadX = CConversion.nGetNumberIfInRange( str4,
+													CActPerfDrumsNotation.PLAYHEAD_X_MIN, CActPerfDrumsNotation.PLAYHEAD_X_MAX, this.nDrumsNotationPlayheadX );
 											}
 											else if ( str3.Equals( "DrumsNotationStems" ) )
 											{
