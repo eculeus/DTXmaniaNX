@@ -741,6 +741,14 @@ namespace DTXMania
                 "Draw note stems and beams on the notation staff. OFF shows the noteheads only, which is easier to read at a glance.");
             this.listItems.Add(this.iDrumsNotationStems);
 
+            this.iDrumsNotationJudge = new CItemToggle("NotationJudge", CDTXMania.ConfigIni.bDrumsNotationJudgeColour,
+                "ONにすると\n" +
+                "楽譜表示の音符が判定の色に\n" +
+                "変わります。\n" +
+                "(Perfect, Great, ...)",
+                "On the notation staff, a note fades from its lane colour to the colour of its judgement as it is played, and keeps it while it is on screen. Perfect is cyan, Great green, Good amber, Poor violet and Miss red and boxed. Auto-played notes keep their lane colour.");
+            this.listItems.Add(this.iDrumsNotationJudge);
+
             this.iDrumsPosition = new CItemList("JudgePosition", CItemBase.EPanelType.Normal, (int)CDTXMania.ConfigIni.JudgementStringPosition.Drums,
                 "ゲーム中に表示される\n"+
                 "判定文字の位置を変更します。\n" +
@@ -3194,6 +3202,7 @@ namespace DTXMania
         private CItemToggle iDrumsReverse;
         private CItemList iDrumsNotationView;
         private CItemToggle iDrumsNotationStems;
+        private CItemToggle iDrumsNotationJudge;
         private CItemInteger iDrumsScrollSpeed;
         private CItemToggle iDrumsSnare;
         private CItemToggle iDrumsTight;
@@ -3450,6 +3459,7 @@ namespace DTXMania
             this.iDrumsReverse.bON = CDTXMania.ConfigIni.bReverse.Drums;
             this.iDrumsNotationView.n現在選択されている項目番号 = CDTXMania.ConfigIni.nDrumsNotationView;
             this.iDrumsNotationStems.bON = CDTXMania.ConfigIni.bDrumsNotationStems;
+            this.iDrumsNotationJudge.bON = CDTXMania.ConfigIni.bDrumsNotationJudgeColour;
             this.iDrumsPosition.n現在選択されている項目番号 = (int)CDTXMania.ConfigIni.JudgementStringPosition.Drums;
             this.iDrumsTight.bON = CDTXMania.ConfigIni.bTight;
             this.iDrumsInputAdjustTimeMs.nCurrentValue = CDTXMania.ConfigIni.nInputAdjustTimeMs.Drums;
@@ -3657,6 +3667,7 @@ namespace DTXMania
             CDTXMania.ConfigIni.bReverse.Drums = this.iDrumsReverse.bON;
             CDTXMania.ConfigIni.nDrumsNotationView = this.iDrumsNotationView.n現在選択されている項目番号;
             CDTXMania.ConfigIni.bDrumsNotationStems = this.iDrumsNotationStems.bON;
+            CDTXMania.ConfigIni.bDrumsNotationJudgeColour = this.iDrumsNotationJudge.bON;
             CDTXMania.ConfigIni.JudgementStringPosition.Drums = (EType)this.iDrumsPosition.n現在選択されている項目番号;
             CDTXMania.ConfigIni.bTight = this.iDrumsTight.bON;
             CDTXMania.ConfigIni.nInputAdjustTimeMs.Drums = this.iDrumsInputAdjustTimeMs.nCurrentValue;		// #23580 2011.1.3 yyagi

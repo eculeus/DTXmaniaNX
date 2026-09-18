@@ -677,6 +677,7 @@ namespace DTXMania
 		public bool bDrumsNotationView { get { return this.nDrumsNotationView > 0; } }
 		public bool bDrumsNotationPage { get { return this.nDrumsNotationView == 2; } }
 		public bool bDrumsNotationStems;  // ...with note stems and beams (off: noteheads only)
+		public bool bDrumsNotationJudgeColour;  // ...and a judged note takes the colour of its judgement
 		public int nDrumsNotationBarsPerLine;   // page view: bars per staff line (ini only, 1-8)
 		public bool bScoreIniを出力する;
 		public bool bSTAGEFAILEDEnabled;
@@ -1398,6 +1399,7 @@ namespace DTXMania
 			this.bReverse = new STDGBVALUE<bool>();
 			this.nDrumsNotationView = 0;
 			this.bDrumsNotationStems = true;
+			this.bDrumsNotationJudgeColour = true;
 			this.nDrumsNotationBarsPerLine = 4;
 			this.eRandom = new STDGBVALUE<ERandomMode>();
 			this.bLight = new STDGBVALUE<bool>();
@@ -2070,6 +2072,8 @@ namespace DTXMania
 			sw.WriteLine( "DrumsNotationView={0}", this.nDrumsNotationView );
 			sw.WriteLine( "; Drums notation view: 1 = draw note stems and beams as well as the noteheads" );
 			sw.WriteLine( "DrumsNotationStems={0}", this.bDrumsNotationStems ? 1 : 0 );
+			sw.WriteLine( "; Drums notation view: 1 = a judged note fades from its lane colour to the colour of its judgement" );
+			sw.WriteLine( "DrumsNotationJudgeColour={0}", this.bDrumsNotationJudgeColour ? 1 : 0 );
 			sw.WriteLine( "; Drums notation page view: how many bars fit on one staff line (1-8)" );
 			sw.WriteLine( "DrumsNotationBarsPerLine={0}", this.nDrumsNotationBarsPerLine );
 			sw.WriteLine();
@@ -3285,6 +3289,10 @@ namespace DTXMania
 											else if ( str3.Equals( "DrumsNotationStems" ) )
 											{
 												this.bDrumsNotationStems = CConversion.bONorOFF( str4[ 0 ] );
+											}
+											else if ( str3.Equals( "DrumsNotationJudgeColour" ) )
+											{
+												this.bDrumsNotationJudgeColour = CConversion.bONorOFF( str4[ 0 ] );
 											}
 											else if( str3.Equals( "GuitarReverse" ) )
 											{
