@@ -874,6 +874,27 @@ namespace DTXMania
 			}
 		}
 
+		/// <summary>
+		/// <para>このキーボードキーが、どのパッドにも割り当てられていないかどうか。</para>
+		/// <para>選曲画面で素のキー(「/」など)をショートカットに使う前に確認する。誰かが</para>
+		/// <para>そのキーをパッドに割り当てていたら、叩いた拍子に画面が開いてしまうので。</para>
+		/// </summary>
+		public bool bキーがキー割り当てのどこにも使用されていない( int nKeyCode )
+		{
+			for( int i = 0; i <= (int)EKeyConfigPart.SYSTEM; i++ )
+			{
+				for( int j = 0; j < (int)EKeyConfigPad.MAX; j++ )
+				{
+					for( int k = 0; k < 0x10; k++ )
+					{
+						if( ( this.KeyAssign[ i ][ j ][ k ].InputDevice == EInputDevice.Keyboard ) && ( this.KeyAssign[ i ][ j ][ k ].Code == nKeyCode ) )
+							return false;
+					}
+				}
+			}
+			return true;
+		}
+
 		public bool bEnterがキー割り当てのどこにも使用されていない
 		{
 			get
@@ -2085,7 +2106,7 @@ namespace DTXMania
 			sw.WriteLine( "; is the music coming. Bigger = more history to look back at, less lookahead." );
 			sw.WriteLine( "DrumsNotationPlayheadX={0}", this.nDrumsNotationPlayheadX );
 			sw.WriteLine();
-			sw.WriteLine( "; Practice loop mode: 1 = song select offers a loop range (Shift+F2) and the run is not scored" );
+			sw.WriteLine( "; Practice loop mode: 1 = song select offers a loop range (\"/\" or Shift+F2) and the run is not scored" );
 			sw.WriteLine( "PracticeMode={0}", this.bPracticeMode ? 1 : 0 );
 			sw.WriteLine();
 			sw.WriteLine( "; ギター/ベースRANDOMモード(0:OFF, 1:Mirror, 2:Random, 3:SuperRandom, 4:HyperRandom)" );

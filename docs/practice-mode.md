@@ -12,7 +12,9 @@ in-play A/B loop that DTXManiaNX already had is untouched.
 ## 1. What the player does
 
 1. `Config > Drums > PracticeMode` → **ON** (`PracticeMode=1` in `[PlayOption]`).
-2. In song select, **Shift+F2** opens the PRACTICE panel for the highlighted chart.
+2. In song select, **`/`** opens the PRACTICE panel for the highlighted chart.
+   (**Shift+F2** does the same and always works; `/` is ignored if you have bound that key
+   to a drum pad, so it cannot fire while you are tapping pads in song select.)
 3. The panel lists, in order:
    - `OFF - play the whole song`
    - every section from the song folder's `sections.def` (if there is one)
@@ -332,7 +334,7 @@ markers, the rescale when you change speed — works for a practice range for fr
 |---|---|
 | Range model, section-file reader, user-range store, bar↔ms map | `DTXMania/Code/Score,Song/CPracticeSections.cs` (new) |
 | Song select panel and the `PRACTICE` badge | `DTXMania/Code/Stage/05.SongSelection/CActSelectPracticePanel.cs` (new) |
-| Shift+F2, modal gate, clearing the range when the song changes | `DTXMania/Code/Stage/05.SongSelection/CStageSongSelection.cs` |
+| "/" and Shift+F2, modal gate, clearing the range when the song changes | `DTXMania/Code/Stage/05.SongSelection/CStageSongSelection.cs` |
 | The chosen range, handed to the performance screen | `CDTXMania.rPracticeRange` |
 | Setup, start jump, rewind, seek clamp, counter reset, wrap | `DTXMania/Code/Stage/07.Performance/CStagePerfCommonScreen.cs` |
 | Calling the start jump and the wrap in the right order | `CStagePerfDrumsScreen.cs`, `CStagePerfGuitarScreen.cs` |
@@ -361,7 +363,7 @@ six tempo changes inside one bar, come out right without any special case.
 ### Lifetime
 
 ```
-song select:  Shift+F2 → panel → CDTXMania.rPracticeRange = <range>   (bars)
+song select:  "/" → panel → CDTXMania.rPracticeRange = <range>   (bars)
               Decide  → tSelectSong() clears it if PracticeMode is off
 song loading: chart is parsed, chip times computed
 performance:  OnActivate  → tPracticeLoop_Setup()
@@ -389,7 +391,10 @@ Two ordering details that are easy to get wrong and are commented in the source:
   move, Decide or RD to pick, LC or Cancel to back out) as well as the arrows, Enter, Escape
   and Delete. Typing a range or a name is keyboard-only, and the name field ignores the pads
   entirely — LC is bound to A and Z by default, so a pad would eat the letters.
-- Shift+F2 is a fixed key, not a bindable `[SystemKeyAssign]` entry. It reuses the slot the
+- The panel opens on `/`, which nothing else in song select uses, and which is ignored while
+  that key is bound to a drum pad (`bキーがキー割り当てのどこにも使用されていない`) so a pad tap
+  cannot open it. Shift+F2 opens it too and is never gated — the reliable way in if `/` is taken.
+- Neither is a bindable `[SystemKeyAssign]` entry. Shift+F2 reuses the slot the
   upstream source has kept free for "some other use in the future" since 2011.
 - Section names are drawn with the song-list font; non-Latin names should work but have not
   been looked at.

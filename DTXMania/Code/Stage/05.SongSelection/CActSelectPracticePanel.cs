@@ -536,7 +536,7 @@ namespace DTXMania
 			CPracticeRange rRange = CDTXMania.rPracticeRange;
 			string strText = ( rRange != null )
 				? ( "PRACTICE  " + rRange.strName + "  [" + rRange.strRangeText + "]" )
-				: "PRACTICE  (Shift+F2 to pick a section)";
+				: "PRACTICE  (press / to pick a section)";
 
 			if( !string.Equals( strText, this.strIndicatorText, StringComparison.Ordinal ) )
 			{
