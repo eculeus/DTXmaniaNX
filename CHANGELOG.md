@@ -9,6 +9,18 @@ Builds are produced by GitHub Actions (`.github/workflows/build.yml`, Release x8
 extracting the zip over an existing DTXManiaNX folder; `Config.ini` is not included, so key
 bindings and settings are kept.
 
+## 1.5.0-beta.18 — 2026-09-19
+
+- The practice panel opens with **`/`**. Shift+F2 was only ever chosen because upstream reserved
+  that combination in 2011, which made it certain to be free rather than good to reach for
+  something you use between every run; nothing else in song select uses `/`.
+- `/` is accepted only while that key is not bound to a drum pad — the care the Decide key
+  already takes with Enter, generalised to any key code — so a pad tap in song select cannot
+  open the panel. **Shift+F2 still works unconditionally**, and is the way in if you have bound
+  `/` to something.
+- The smoke test drives `/` rather than the Shift chord, so the key a player actually presses is
+  the one under test. (That chord had also failed silently once in CI, costing a re-run.)
+
 ## 1.5.0-beta.17 — 2026-09-18
 
 - **Play speed works again with TimeStretch ON** (WASAPI/ASIO). Changing the speed used to swap

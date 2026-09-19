@@ -514,7 +514,7 @@ jobs:
           }
 
       # Fourth launch: the practice loop. Boots to the title screen, walks into song select,
-      # opens the PRACTICE panel with Shift+F2, picks the "Verse" section out of the song
+      # opens the PRACTICE panel with "/", picks the "Verse" section out of the song
       # folder's sections.def, starts the song, and watches it loop. The section resolves to a
       # fixed pair of milliseconds that this step asserts, which is the real test of the
       # bar -> ms conversion: it has to get DTXMania's inserted empty bar, a 1/4 bar, a 3/4 bar
@@ -597,6 +597,7 @@ jobs:
           $VK_RETURN = 0x0D
           $VK_DOWN   = 0x28
           $VK_F2     = 0x71
+          $VK_SLASH  = 0xBF      # the "/" key, which is how the panel is opened in practice
           $VK_EQUALS = 0xBB      # the Restart key, "=" by default
 
           Write-Host "Launching (practice loop): $exe   DTXPath=$songDir"
@@ -629,10 +630,11 @@ jobs:
           Snap 'select'
 
           if (-not $proc.HasExited) {
-            # Shift+F2 opens the PRACTICE panel.
+            # "/" opens the PRACTICE panel (Shift+F2 does too, and is the fallback when someone
+            # has bound "/" to a pad; this run exercises the key a player actually uses).
             Focus-Game
-            Write-Host "Shift+F2 (open the practice panel)"
-            [Drive2]::TapShift([byte]$VK_F2, 80)
+            Write-Host "/ (open the practice panel)"
+            [Drive2]::Tap([byte]$VK_SLASH, 80)
             for ($t = 1; $t -le 3; $t++) { Focus-Game; Start-Sleep -Seconds 1 }
             Snap 'panel'
 
