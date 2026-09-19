@@ -9,6 +9,18 @@ Builds are produced by GitHub Actions (`.github/workflows/build.yml`, Release x8
 extracting the zip over an existing DTXManiaNX folder; `Config.ini` is not included, so key
 bindings and settings are kept.
 
+## 1.5.0-beta.18 — 2026-09-19
+
+- The practice panel opens with **`/`**. Shift+F2 was only ever chosen because upstream reserved
+  that combination in 2011, which made it certain to be free rather than good to reach for
+  something you use between every run; nothing else in song select uses `/`.
+- `/` is accepted only while that key is not bound to a drum pad — the care the Decide key
+  already takes with Enter, generalised to any key code — so a pad tap in song select cannot
+  open the panel. **Shift+F2 still works unconditionally**, and is the way in if you have bound
+  `/` to something.
+- The smoke test drives `/` rather than the Shift chord, so the key a player actually presses is
+  the one under test. (That chord had also failed silently once in CI, costing a re-run.)
+
 ## 1.5.0-beta.17 — 2026-09-18
 
 - **Play speed works again with TimeStretch ON** (WASAPI/ASIO). Changing the speed used to swap
@@ -59,7 +71,7 @@ bindings and settings are kept.
   last note has left the staff rather than a fifth of a second after it passed the playhead.
 
 - **Practice loop mode.** `Config > Drums > PracticeMode` (`PracticeMode=` in `[PlayOption]`,
-  off by default). With it on, **`/`** in song select opens a PRACTICE panel: pick a named
+  off by default). With it on, **Shift+F2** in song select opens a PRACTICE panel: pick a named
   section of the song, or type a bar range and save it under a name, and the performance screen
   plays only that range and loops it in place. `=` rewinds to the start of the range instead of
   going back to the song-begin screen; seek and speed keys keep working and seeking is clamped
@@ -72,9 +84,6 @@ bindings and settings are kept.
   yourself live in `PracticeRanges.ini` next to the game, so re-downloading a song folder does
   not wipe them. Format, bar-numbering convention and a worked example (a 6/4 song with 3/4
   bars and six tempo changes inside one bar) are in `docs/practice-mode.md`.
-- The panel opens with **`/`**, or with **Shift+F2** which always works. `/` is only accepted
-  when that key is not bound to a drum pad, the same care the Decide key takes with Enter, so a
-  pad tap in song select cannot open the panel.
 - The smoke test drives the new panel from song select and asserts the section's bar range
   resolves to the right milliseconds and that the loop actually wraps.
 
