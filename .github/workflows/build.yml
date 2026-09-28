@@ -917,7 +917,10 @@ jobs:
           $env:DTXMANIA_AUTOCAPTURE_MS = '1000'
           $env:FDK_ALLOW_SILENT_SOUND_DEVICE = '1'
 
-          $VK_RETURN = 0x0D; $VK_ESCAPE = 0x1B; $VK_UP = 0x26; $VK_DOWN = 0x28; $VK_SNARE = 0x43
+          # Menus are walked with the HT/LT pad keys (V / B by default): title and CONFIG take those
+          # as press EVENTS, whereas their arrow keys are read as held STATE, which a short injected
+          # tap can miss entirely on this runner's slow frames (the first attempt did).
+          $VK_RETURN = 0x0D; $VK_ESCAPE = 0x1B; $VK_HT = 0x56; $VK_LT = 0x42; $VK_SNARE = 0x43
           $proc = Start-Process -FilePath $exe -WorkingDirectory $game -PassThru
           function Focus-Game { $h = $proc.MainWindowHandle; if ($h -ne [IntPtr]::Zero) { [void][Drive4]::SetForegroundWindow($h) } }
           function Wait-Log([string]$pattern, [int]$seconds) {
@@ -934,15 +937,15 @@ jobs:
             if (-not (Wait-Log '(?m)\sTitle\s*$' 30)) { throw "never reached the title screen" }
             Start-Sleep -Seconds 3
             Focus-Game
-            [Drive4]::Tap([byte]$VK_DOWN, 60, $true); Start-Sleep -Milliseconds 400      # GAME START -> CONFIG
+            [Drive4]::Tap([byte]$VK_LT, 60, $false); Start-Sleep -Milliseconds 800      # GAME START -> CONFIG
             [Drive4]::Tap([byte]$VK_RETURN, 60, $false)
             if (-not (Wait-Log '(?m)\sConfig\s*$' 15)) { throw "never reached CONFIG" }
             Start-Sleep -Seconds 3
             Focus-Game
-            [Drive4]::Tap([byte]$VK_DOWN, 60, $true); Start-Sleep -Milliseconds 600      # System -> Drums
+            [Drive4]::Tap([byte]$VK_LT, 60, $false); Start-Sleep -Milliseconds 800      # System -> Drums
             [Drive4]::Tap([byte]$VK_RETURN, 60, $false); Start-Sleep -Milliseconds 600   # into the item list
             # Up from the top wraps: Drums Keys, the 8 window items, then Calibrate... is the 10th.
-            for ($i = 1; $i -le 10; $i++) { [Drive4]::Tap([byte]$VK_UP, 40, $true); Start-Sleep -Milliseconds 250 }
+            for ($i = 1; $i -le 10; $i++) { [Drive4]::Tap([byte]$VK_HT, 40, $false); Start-Sleep -Milliseconds 300 }
             Start-Sleep -Milliseconds 800
             Focus-Game
             $sw = [System.Diagnostics.Stopwatch]::StartNew()
