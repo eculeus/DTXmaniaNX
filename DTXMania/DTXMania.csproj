@@ -192,7 +192,9 @@
     <Compile Include="Code\Stage\02.Title\CActEnumSongs.cs" />
     <Compile Include="Code\Stage\02.Title\CStageTitle.cs" />
     <Compile Include="Code\Stage\03.Option\CStageOption.cs" />
+    <Compile Include="Code\Stage\04.Config\CActConfigCalibration.cs" />
     <Compile Include="Code\Stage\04.Config\CActConfigKeyAssign.cs" />
+    <Compile Include="Code\Stage\04.Config\CCalibrationMath.cs" />
     <Compile Include="Code\Stage\04.Config\CActConfigList.cs" />
     <Compile Include="Code\Stage\04.Config\CStageConfig.cs" />
     <Compile Include="Code\Stage\05.SongSelection\CActSelectArtistComment.cs" />

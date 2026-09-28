@@ -30,6 +30,7 @@ namespace DTXMania
             base.listChildActivities.Add(this.actFIFO = new CActFIFOWhite());
             base.listChildActivities.Add(this.actList = new CActConfigList());
             base.listChildActivities.Add(this.actKeyAssign = new CActConfigKeyAssign());
+            base.listChildActivities.Add(this.actCalibration = new CActConfigCalibration());
             //base.listChildActivities.Add(this.actオプションパネル = new CActOptionPanel());
             base.bNotActivated = true;
         }
@@ -46,6 +47,24 @@ namespace DTXMania
             this.actKeyAssign.tStart(part, pad, this.actList.ibCurrentSelection.strItemName);		//
             this.eItemPanelMode = EItemPanelMode.KeyCodeList;							//
         }																						//
+        public void tStartCalibration()																// Config > Drums > Calibrate
+        {
+            // The item list is shared with the OPTION stage (song select); calibration lives here only.
+            if (base.bNotActivated)
+                return;
+            this.eItemPanelMode = EItemPanelMode.Calibration;
+            this.actCalibration.tStart();
+        }
+        public void tNotifyCalibrationComplete()
+        {
+            this.eItemPanelMode = EItemPanelMode.PadList;
+            CDTXMania.Skin.bgmコンフィグ画面.tPlay();
+            this.tDrawSelectedItemDescriptionInDescriptionPanel();
+        }
+        public void tApplyDrumsInputAdjust(int nMs)
+        {
+            this.actList.tSetDrumsInputAdjust(nMs);
+        }
         public void tNotifyItemChange()																// OPTIONと共通
         {																						//
             this.tDrawSelectedItemDescriptionInDescriptionPanel();						//
@@ -243,6 +262,9 @@ namespace DTXMania
 
             #region [ アイテム ]
             //---------------------
+            // The calibration screen owns all input while it is up, including the frame it closes
+            // on: its Escape/Enter must not also reach the menu underneath.
+            bool bCalibrationOwnsInput = (this.eItemPanelMode == EItemPanelMode.Calibration);
             switch (this.eItemPanelMode)
             {
                 case EItemPanelMode.PadList:
@@ -252,12 +274,16 @@ namespace DTXMania
                 case EItemPanelMode.KeyCodeList:
                     this.actKeyAssign.OnUpdateAndDraw();
                     break;
+
+                case EItemPanelMode.Calibration:
+                    this.actCalibration.OnUpdateAndDraw();
+                    break;
             }
             //---------------------
             #endregion
             #region [ Description panel ]
             //---------------------
-            if( this.txDescriptionPanel != null && !this.bFocusIsOnMenu && this.actList.nTargetScrollCounter == 0 && this.ctDisplayWait.bReachedEndValue )
+            if( this.txDescriptionPanel != null && !this.bFocusIsOnMenu && this.eItemPanelMode != EItemPanelMode.Calibration && this.actList.nTargetScrollCounter == 0 && this.ctDisplayWait.bReachedEndValue )
                 // 15SEP20 Increasing x position by 180 pixels (was 620)
                 this.txDescriptionPanel.tDraw2D(CDTXMania.app.Device, 800, 270);
             //---------------------
@@ -308,6 +334,7 @@ namespace DTXMania
 
             if ((base.ePhaseID != CStage.EPhase.Common_DefaultState)
                 || this.actKeyAssign.bキー入力待ちの最中である
+                || bCalibrationOwnsInput
                 || CDTXMania.actPluginOccupyingInput != null)
                 return 0;
 
@@ -400,7 +427,8 @@ namespace DTXMania
         private enum EItemPanelMode
         {
             PadList,
-            KeyCodeList
+            KeyCodeList,
+            Calibration
         }
 
         [StructLayout(LayoutKind.Sequential)]
@@ -457,6 +485,7 @@ namespace DTXMania
 
         private CActFIFOWhite actFIFO;
         private CActConfigKeyAssign actKeyAssign;
+        private CActConfigCalibration actCalibration;
         private CActConfigList actList;
         //private CActOptionPanel actオプションパネル;
         private bool bFocusIsOnMenu;

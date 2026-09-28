@@ -1148,6 +1148,18 @@ namespace DTXMania
                 "To decrease input lag, set minus value.");
             this.listItems.Add(this.iDrumsInputAdjustTimeMs);
 
+            this.iDrumsCalibrate = new CItemBase("Calibrate...", CItemBase.EPanelType.Normal,
+                "クリックに合わせて叩き、\n" +
+                "InputAdjust の値を測定します。\n" +
+                "カウント4回の後、24打。\n" +
+                "中央値のずれから推奨値を出し、\n" +
+                "Apply で InputAdjust に反映。\n" +
+                "Cancel/Esc では何も変わりません。",
+                "Measure InputAdjust: play along with a click (120 BPM) on any pad, 4 count-in clicks then 24 hits. " +
+                "Shows each hit early/late, the median and spread, and suggests the InputAdjust that centres your hits. " +
+                "Apply sets InputAdjust; Retry or Cancel/Esc change nothing.");
+            this.listItems.Add(this.iDrumsCalibrate);
+
             // Judgement windows: [HitRange] DrumPerfect..DrumPoor and DrumPedalPerfect..DrumPedalPoor.
             // Rule: Perfect <= Great <= Good <= Poor. An item being changed is clamped between its
             // neighbours (tClampHitRangeItem); values read from Config.ini are shown and saved as-is.
@@ -1842,6 +1854,10 @@ namespace DTXMania
                 {
                     tSetupItemList_System();
                 }
+                else if (this.listItems[this.nCurrentSelection] == this.iDrumsCalibrate)
+                {
+                    CDTXMania.stageConfig.tStartCalibration();
+                }
                 else if (this.listItems[this.nCurrentSelection] == this.iDrumsGoToKeyAssign)				// #24525 2011.3.15 yyagi
                 {
                     t項目リストの設定_KeyAssignDrums();
@@ -2422,6 +2438,16 @@ namespace DTXMania
                 this.tClampHitRangeItem(this.iDrumsHitRanges);
                 this.tClampHitRangeItem(this.iDrumsPedalHitRanges);
             }
+        }
+
+        /// <summary>
+        /// Calibration's Apply: set InputAdjust (drums) in the menu item and in ConfigIni, so leaving
+        /// the Drums menu (which records the items to ConfigIni) keeps the new value.
+        /// </summary>
+        public void tSetDrumsInputAdjust(int nMs)
+        {
+            this.iDrumsInputAdjustTimeMs.nCurrentValue = nMs;
+            CDTXMania.ConfigIni.nInputAdjustTimeMs.Drums = nMs;
         }
 
         #region [ Drum judgement windows ([HitRange]) ]
@@ -3369,6 +3395,7 @@ namespace DTXMania
         private CItemToggle iGuitarGraph;
 
         private CItemInteger iDrumsInputAdjustTimeMs;		// #23580 2011.1.3 yyagi
+        private CItemBase iDrumsCalibrate;
         private CItemInteger[] iDrumsHitRanges;			// Perfect, Great, Good, Poor ([HitRange] Drum*)
         private CItemInteger[] iDrumsPedalHitRanges;		// Perfect, Great, Good, Poor ([HitRange] DrumPedal*)
         private CItemInteger iGuitarInputAdjustTimeMs;		//
