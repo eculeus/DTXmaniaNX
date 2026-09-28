@@ -53,7 +53,7 @@ depend on:
 | `game` | version string and the exe's build time |
 | `chart`, `title`, `difficulty`, `dlevel` | what was played |
 | `play_speed` | `PlaySpeed/20`; at anything but 1.000 all times are on the sped-up clock |
-| `input_adjust_ms` | `InputAdjustTimeDrums` when the play started (the per-row column has the value in effect for that row; it can be changed in play with the arrow keys) |
+| `input_adjust_ms` | `InputAdjustTimeDrums` when the play started (the per-row column has the value in effect for that row; it can be changed in play with Shift+Left/Right unless `InputAdjustInPlay=0`) |
 | `bgm_adjust_ms` | the chart's BGM adjust and the common `BGMAdjust` |
 | `hit_range_ms`, `pedal_hit_range_ms` | the Perfect/Great/Good/Poor half-widths in force (pedals BD/LP/LBD have their own) |
 | `velocity_min` | `VelocityMin` per pad: a hit at or below it is dropped |

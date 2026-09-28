@@ -384,6 +384,7 @@ namespace DTXMania
             this.bIsTrainingMode = false;
             this.bPAUSE = false;
             this.ctSkipDisplay = null;
+            this.ctInputAdjustDisplay = null;
 
             this.tPracticeLoop_Setup();
 
@@ -510,6 +511,7 @@ namespace DTXMania
                 CDTXMania.tReleaseTexture(ref this.txBonusEffect);
                 CDTXMania.tReleaseTexture(ref this.txPlaySpeed);
                 CDTXMania.tReleaseTexture(ref this.txSkip);
+                CDTXMania.tReleaseTexture(ref this.txInputAdjust);
                 base.OnManagedReleaseResources();
             }
         }
@@ -865,6 +867,9 @@ namespace DTXMania
         protected CTexture txPlaySpeed;
         protected CTexture txSkip;						// 演奏中スキップの "SKIP" 表示
         protected CCounter ctSkipDisplay;
+        protected CTexture txInputAdjust;				// "InputAdjust (Drums): -40 ms" after an in-play change
+        protected CCounter ctInputAdjustDisplay;
+        protected const int nInputAdjustIndicatorDisplayTimeMs = 2000;
         protected const int nSkipIndicatorDisplayTimeMs = 1000;
         public CTexture tx判定画像anime;     //2013.8.2 kairera0467 アニメーションの場合はあらかじめこっちで読み込む。
         public CTexture tx判定画像anime_2;   //2014.3.16 kairera0467 棒とかで必要になる。
@@ -2333,20 +2338,30 @@ namespace DTXMania
             return this.rNextBassChip;
         }
 
+        /// <summary>
+        /// Shift+Left/Right in play: InputAdjust -/+10 ms (Shift+Ctrl: 1 ms). Shift+Alt changes the bass.
+        /// Plain arrows used to do this with no feedback, and a stray press silently moved the value
+        /// (and Config.ini) - so Shift is now required, every change is shown on screen, and
+        /// InputAdjustInPlay=0 turns it off altogether.
+        /// </summary>
+        protected static bool bShiftHeld(IInputDevice keyboard)
+        {
+            return keyboard.bKeyPressing((int)SlimDXKey.LeftShift) || keyboard.bKeyPressing((int)SlimDXKey.RightShift);
+        }
         protected void ChangeInputAdjustTimeInPlaying(IInputDevice keyboard, int plusminus)		// #23580 2011.1.16 yyagi UI for InputAdjustTime in playing screen.
         {
             int part, offset = plusminus;
-            if (keyboard.bKeyPressing((int)SlimDXKey.LeftShift) || keyboard.bKeyPressing((int)SlimDXKey.RightShift))	// Guitar InputAdjustTime
-            {
-                part = (int)EInstrumentPart.GUITAR;
-            }
-            else if (keyboard.bKeyPressing((int)SlimDXKey.LeftAlt) || keyboard.bKeyPressing((int)SlimDXKey.RightAlt))	// Bass InputAdjustTime
+            if (keyboard.bKeyPressing((int)SlimDXKey.LeftAlt) || keyboard.bKeyPressing((int)SlimDXKey.RightAlt))	// Bass InputAdjustTime
             {
                 part = (int)EInstrumentPart.BASS;
             }
-            else	// Drums InputAdjustTime
+            else if (CDTXMania.ConfigIni.bDrumsEnabled)	// Drums InputAdjustTime
             {
                 part = (int)EInstrumentPart.DRUMS;
+            }
+            else	// Guitar InputAdjustTime
+            {
+                part = (int)EInstrumentPart.GUITAR;
             }
             if (!keyboard.bKeyPressing((int)SlimDXKey.LeftControl) && !keyboard.bKeyPressing((int)SlimDXKey.RightControl))
             {
@@ -2363,6 +2378,37 @@ namespace DTXMania
                 this.nInputAdjustTimeMs[part] = -99;
             }
             CDTXMania.ConfigIni.nInputAdjustTimeMs[part] = this.nInputAdjustTimeMs[part];
+
+            string strPart = (part == (int)EInstrumentPart.DRUMS) ? "Drums" : (part == (int)EInstrumentPart.GUITAR) ? "Guitar" : "Bass";
+            int v = this.nInputAdjustTimeMs[part];
+            this.tStartInputAdjustIndicator(string.Format("InputAdjust ({0}): {1}{2} ms", strPart, v > 0 ? "+" : "", v));
+            Trace.TraceInformation("InputAdjust ({0}) changed in play: {1} ms", strPart, v);
+        }
+
+        private void tStartInputAdjustIndicator(string str)
+        {
+            CDTXMania.tReleaseTexture(ref this.txInputAdjust);
+            CPrivateFastFont pf = new CPrivateFastFont(new FontFamily(CDTXMania.ConfigIni.str選曲リストフォント), 22, FontStyle.Bold);
+            Bitmap bmp = pf.DrawPrivateFont(str, CPrivateFont.DrawMode.Edge, Color.White, Color.White, Color.Black, Color.Red, true);
+            this.txInputAdjust = CDTXMania.tGenerateTexture(bmp, false);
+            bmp.Dispose();
+            pf.Dispose();
+            this.ctInputAdjustDisplay = new CCounter(0, nInputAdjustIndicatorDisplayTimeMs, 1, CDTXMania.Timer);
+        }
+
+        /// <summary>The "InputAdjust (Drums): -40 ms" line shown for 2 s after an in-play change.</summary>
+        protected void tUpdateAndDraw_InputAdjustIndicator(int x, int y)
+        {
+            if ((this.ctInputAdjustDisplay == null) || this.ctInputAdjustDisplay.b停止中)
+                return;
+            this.ctInputAdjustDisplay.tUpdate();
+            if (this.ctInputAdjustDisplay.bReachedEndValue)
+            {
+                this.ctInputAdjustDisplay.tStop();
+                return;
+            }
+            if (this.txInputAdjust != null)
+                this.txInputAdjust.tDraw2D(CDTXMania.app.Device, x, y);
         }
 
         protected abstract void tHandleInput_Drums();
@@ -2418,11 +2464,11 @@ namespace DTXMania
                 {	// del (debug info)
                     CDTXMania.ConfigIni.b演奏情報を表示する = !CDTXMania.ConfigIni.b演奏情報を表示する;
                 }
-                else if (!this.bPAUSE && keyboard.bKeyPressed((int)SlimDXKey.LeftArrow))		// #24243 2011.1.16 yyagi UI for InputAdjustTime in playing screen.
+                else if (!this.bPAUSE && CDTXMania.ConfigIni.bInputAdjustInPlay && bShiftHeld(keyboard) && keyboard.bKeyPressed((int)SlimDXKey.LeftArrow))		// #24243 2011.1.16 yyagi UI for InputAdjustTime in playing screen.
                 {
                     ChangeInputAdjustTimeInPlaying(keyboard, -1);
                 }
-                else if (!this.bPAUSE && keyboard.bKeyPressed((int)SlimDXKey.RightArrow))		// #24243 2011.1.16 yyagi UI for InputAdjustTime in playing screen.
+                else if (!this.bPAUSE && CDTXMania.ConfigIni.bInputAdjustInPlay && bShiftHeld(keyboard) && keyboard.bKeyPressed((int)SlimDXKey.RightArrow))		// #24243 2011.1.16 yyagi UI for InputAdjustTime in playing screen.
                 {
                     ChangeInputAdjustTimeInPlaying(keyboard, +1);
                 }

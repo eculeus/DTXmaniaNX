@@ -756,6 +756,16 @@ jobs:
             '    System.Threading.Thread.Sleep(holdMs);',
             '    keybd_event(vk, sc, 2, UIntPtr.Zero);',
             '  }',
+            '  // an arrow (extended key), optionally with Shift held well before and after: the game',
+            '  // reads Shift as held state, which must still be down when the arrow event is handled',
+            '  public static void Arrow(byte vk, bool shift) {',
+            '    if (shift) keybd_event(0xA0, (byte)MapVirtualKey(0xA0, 0), 0, UIntPtr.Zero);',
+            '    System.Threading.Thread.Sleep(400);',
+            '    byte sc = (byte)MapVirtualKey(vk, 0);',
+            '    keybd_event(vk, sc, 1, UIntPtr.Zero); System.Threading.Thread.Sleep(60); keybd_event(vk, sc, 3, UIntPtr.Zero);',
+            '    System.Threading.Thread.Sleep(400);',
+            '    if (shift) keybd_event(0xA0, (byte)MapVirtualKey(0xA0, 0), 2, UIntPtr.Zero);',
+            '  }',
             '}'
           ) -join [Environment]::NewLine)
 
@@ -803,6 +813,9 @@ jobs:
             if ($h -ne [IntPtr]::Zero) { [void][Drive3]::SetForegroundWindow($h) }
             [Drive3]::Tap([byte]$VK_SNARE, 30)
             Start-Sleep -Milliseconds 220
+            # in-play InputAdjust: a plain Left must do nothing, Shift+Right must add 10 ms
+            if ($i -eq 30) { Write-Host "plain Left"; [Drive3]::Arrow(0x25, $false) }
+            if ($i -eq 40) { Write-Host "Shift+Right"; [Drive3]::Arrow(0x27, $true) }
             $proc.Refresh()
             if ($proc.HasExited) { Write-Host "!! exited during play, code $($proc.ExitCode)"; break }
           }
@@ -856,6 +869,9 @@ jobs:
           }
           if (-not ($lines | Where-Object { $_ -like '# SUMMARY*' })) { throw "no summary" }
           if ($log -notmatch 'DrumHitLog: wrote') { throw "the game log does not report the write" }
+          $adj = @([regex]::Matches($log, 'InputAdjust \(Drums\) changed in play: (-?\d+) ms') | ForEach-Object { $_.Groups[1].Value })
+          Write-Host "in-play InputAdjust changes: $($adj -join ', ')"
+          if ($adj.Count -ne 1 -or $adj[0] -ne '10') { throw "expected exactly one in-play change, to +10 (plain Left must do nothing, Shift+Right +10); got: $($adj -join ', ')" }
           Write-Host "hit log OK"
 
       # Sixth launch: the timing calibration. Boots to the title screen, walks into CONFIG >

@@ -1138,6 +1138,18 @@ namespace DTXMania
 				"To draw Graph or not." );
 			this.listItems.Add( this.iDrumsGraph );
 
+            this.iDrumsInputAdjustInPlay = new CItemToggle("AdjustInPlay", CDTXMania.ConfigIni.bInputAdjustInPlay,
+                "ONにすると演奏中に\n" +
+                "Shift+←/→ で InputAdjust を\n" +
+                "10ms ずつ変更できます\n" +
+                "(Shift+Ctrl で 1ms)。\n" +
+                "変更は画面に表示され、保存されます。\n" +
+                "OFF: 演奏中は変更できません。",
+                "Change InputAdjust during play with Shift+Left/Right (10 ms; Shift+Ctrl: 1 ms; Shift+Alt: bass). " +
+                "Each change is shown on screen for 2 s and saved to Config.ini. Plain arrows do nothing. " +
+                "OFF: InputAdjust cannot be changed in play at all.");
+            this.listItems.Add(this.iDrumsInputAdjustInPlay);
+
             // #23580 2011.1.3 yyagi
             this.iDrumsInputAdjustTimeMs = new CItemInteger("InputAdjust", -99, 99, CDTXMania.ConfigIni.nInputAdjustTimeMs.Drums,
                 "ドラムの入力タイミングの微調整を行います。\n" +
@@ -3396,6 +3408,7 @@ namespace DTXMania
 
         private CItemInteger iDrumsInputAdjustTimeMs;		// #23580 2011.1.3 yyagi
         private CItemBase iDrumsCalibrate;
+        private CItemToggle iDrumsInputAdjustInPlay;
         private CItemInteger[] iDrumsHitRanges;			// Perfect, Great, Good, Poor ([HitRange] Drum*)
         private CItemInteger[] iDrumsPedalHitRanges;		// Perfect, Great, Good, Poor ([HitRange] DrumPedal*)
         private CItemInteger iGuitarInputAdjustTimeMs;		//
@@ -3610,6 +3623,7 @@ namespace DTXMania
             this.iDrumsPosition.n現在選択されている項目番号 = (int)CDTXMania.ConfigIni.JudgementStringPosition.Drums;
             this.iDrumsTight.bON = CDTXMania.ConfigIni.bTight;
             this.iDrumsInputAdjustTimeMs.nCurrentValue = CDTXMania.ConfigIni.nInputAdjustTimeMs.Drums;
+            this.iDrumsInputAdjustInPlay.bON = CDTXMania.ConfigIni.bInputAdjustInPlay;
             tSetHitRangeItems(this.iDrumsHitRanges, CDTXMania.ConfigIni.stDrumHitRanges);
             tSetHitRangeItems(this.iDrumsPedalHitRanges, CDTXMania.ConfigIni.stDrumPedalHitRanges);
             this.iDrumsHIDSUD.n現在選択されている項目番号 = CDTXMania.ConfigIni.nHidSud.Drums;
@@ -3822,6 +3836,7 @@ namespace DTXMania
             CDTXMania.ConfigIni.JudgementStringPosition.Drums = (EType)this.iDrumsPosition.n現在選択されている項目番号;
             CDTXMania.ConfigIni.bTight = this.iDrumsTight.bON;
             CDTXMania.ConfigIni.nInputAdjustTimeMs.Drums = this.iDrumsInputAdjustTimeMs.nCurrentValue;		// #23580 2011.1.3 yyagi
+            CDTXMania.ConfigIni.bInputAdjustInPlay = this.iDrumsInputAdjustInPlay.bON;
             tGetHitRangeItems(this.iDrumsHitRanges, ref CDTXMania.ConfigIni.stDrumHitRanges);
             tGetHitRangeItems(this.iDrumsPedalHitRanges, ref CDTXMania.ConfigIni.stDrumPedalHitRanges);
             CDTXMania.ConfigIni.nHidSud.Drums = this.iDrumsHIDSUD.n現在選択されている項目番号;

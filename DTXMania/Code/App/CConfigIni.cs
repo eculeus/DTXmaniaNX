@@ -695,6 +695,7 @@ namespace DTXMania
 		public bool bランダムセレクトで子BOXを検索対象とする;
 		public bool bOutputLogs;
 		public bool bDrumHitLog;          // per-hit drum timing log to HitLogs\*.csv (docs/hit-log.md)
+		public bool bInputAdjustInPlay;   // Shift+Left/Right may change InputAdjust during play ([System] InputAdjustInPlay)
 		public STDGBVALUE<bool> b演奏音を強調する;
 		public bool b演奏情報を表示する;
         public bool bAutoAddGage; //2012.9.18
@@ -1417,6 +1418,7 @@ namespace DTXMania
 			this.n手動再生音量 = 100;
 			this.bOutputLogs = true;
 			this.bDrumHitLog = false;
+			this.bInputAdjustInPlay = true;
             this.b曲名表示をdefのものにする = true;
 			this.b演奏音を強調する = new STDGBVALUE<bool>();
 			this.bSudden = new STDGBVALUE<bool>();
@@ -2027,6 +2029,10 @@ namespace DTXMania
             sw.WriteLine("InputAdjustTimeDrums={0}", this.nInputAdjustTimeMs.Drums);		//
             sw.WriteLine("InputAdjustTimeGuitar={0}", this.nInputAdjustTimeMs.Guitar);		//
             sw.WriteLine("InputAdjustTimeBass={0}", this.nInputAdjustTimeMs.Bass);			//
+            sw.WriteLine();
+            sw.WriteLine("; 演奏中に Shift+←/→ で判定タイミング調整を変更できるようにする (0:OFF, 1:ON)");
+            sw.WriteLine("; Allow Shift+Left/Right (Shift+Ctrl: 1 ms steps) to change InputAdjust during play (0:OFF, 1:ON).");
+            sw.WriteLine("InputAdjustInPlay={0}", this.bInputAdjustInPlay ? 1 : 0);
             sw.WriteLine();
 
             sw.WriteLine( "; BGMタイミング調整(-99～99)[ms]" );                              // #36372 2016.06.19 kairera0467
@@ -3176,6 +3182,10 @@ namespace DTXMania
                                             else if ( str3.Equals( "InputAdjustTimeDrums" ) )		// #23580 2011.1.3 yyagi
                                             {
                                                 this.nInputAdjustTimeMs.Drums = CConversion.nGetNumberIfInRange(str4, -99, 99, this.nInputAdjustTimeMs.Drums);
+                                            }
+                                            else if ( str3.Equals( "InputAdjustInPlay" ) )
+                                            {
+                                                this.bInputAdjustInPlay = CConversion.bONorOFF( str4[ 0 ] );
                                             }
                                             else if ( str3.Equals( "InputAdjustTimeGuitar" ) )	// #23580 2011.1.3 yyagi
                                             {

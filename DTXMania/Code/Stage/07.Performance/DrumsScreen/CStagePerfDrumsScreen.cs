@@ -410,6 +410,9 @@ namespace DTXMania
                 this.tUpdateAndDraw_SkipIndicator(
                     bNotationView ? CActPerfDrumsNotation.SKIP_X : 25,
                     bNotationView ? CActPerfDrumsNotation.SKIP_Y : 240);
+                this.tUpdateAndDraw_InputAdjustIndicator(
+                    bNotationView ? CActPerfDrumsNotation.SKIP_X : 25,
+                    (bNotationView ? CActPerfDrumsNotation.SKIP_Y : 240) + 40);
                 //
                 
                 this.tUpdateAndDraw_STAGEFAILED();

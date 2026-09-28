@@ -77,6 +77,15 @@ bindings and settings are kept.
   sixth run that walks title → CONFIG → Drums → Calibrate..., taps the snare key on a grid about
   60 ms behind the clicks, applies the result and checks `Config.ini` gets it, with the
   `[HitRange]` values (one non-default) written back unchanged.
+- **InputAdjust no longer changes on a stray arrow key.** In play, plain Left/Right used to move
+  `InputAdjust` by 10 ms (1 with Ctrl) with no feedback and save it to `Config.ini`; an
+  accidental press had drifted Greg's to 70 ms without his knowing, which wrecked his timing. Now
+  it takes **Shift+Left/Right** (Shift+Ctrl for 1 ms steps, Shift+Alt for the bass; the part is
+  drums when drums are on, otherwise guitar), plain arrows do nothing, and every change shows
+  `InputAdjust (Drums): -40 ms` for 2 s next to where SKIP appears (and is written to the log).
+  Shift+Left/Right had no other binding in the performance screen (Shift+Up/Down is BGMAdjust).
+- `InputAdjustInPlay=0` in `[System]` (next to `InputAdjustTimeDrums`), or `Config > Drums > AdjustInPlay` OFF, turns in-play
+  changes off entirely (default ON, with the Shift requirement).
 
 ## 1.5.0-beta.18 — 2026-09-19
 
