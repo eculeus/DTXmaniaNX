@@ -240,6 +240,7 @@
     <Compile Include="Code\Stage\07.Performance\GuitarScreen\CStagePerfGuitarScreen.cs" />
     <Compile Include="Code\Stage\07.Performance\CActPerfStageFailure.cs" />
     <Compile Include="Code\Stage\07.Performance\CActPerfAVI.cs" />
+    <Compile Include="Code\Stage\07.Performance\DrumsScreen\CDrumHitLog.cs" />
     <Compile Include="Code\Stage\07.Performance\DrumsScreen\CActPerfDrumsDanger.cs" />
     <Compile Include="Code\Stage\07.Performance\DrumsScreen\CActPerfDrumsNotation.cs" />
     <Compile Include="Code\Stage\07.Performance\DrumsScreen\CActPerfDrumsRGB.cs" />

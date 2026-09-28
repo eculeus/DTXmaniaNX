@@ -878,6 +878,8 @@ namespace DTXMania
 
         protected CTexture tx背景;
         protected STDGBVALUE<int> nInputAdjustTimeMs;		// #23580 2011.1.3 yyagi
+        /// <summary>Per-hit drum timing log; null unless DrumHitLog=1 (created by the drums screen).</summary>
+        protected CDrumHitLog hitLog;
         public STAUTOPLAY bIsAutoPlay;		// #24239 2011.1.23 yyagi
         //		protected int nRisky_InitialVar, nRiskyTime;		// #23559 2011.7.28 yyagi → CAct演奏ゲージ共通クラスに隠蔽
         protected int nPolyphonicSounds;
@@ -1461,6 +1463,9 @@ namespace DTXMania
                         // is the whole point: the note that went by red is the one that was missed.
                         if (bNotationView)
                             this.tNotationJudge(pChip, bPChipIsAutoPlay ? EJudgement.Auto : eJudgeResult);
+                        // per-hit timing log (DrumHitLog=1): records what was just decided, changes nothing
+                        if (this.hitLog != null)
+                            this.hitLog.tChipJudged(nHitTime, pChip, eJudgeResult, bPChipIsAutoPlay, bCorrectLane, nInputAdjustTime);
                     }
                     break;
 
@@ -5868,6 +5873,8 @@ namespace DTXMania
             Trace.TraceInformation("JUMP IN SONG currentPosition={0}, newPosition={1}", CSoundManager.rcPerformanceTimer.nCurrentTime, nNewPosition);
 
             long oldPosition = CSoundManager.rcPerformanceTimer.nCurrentTime;
+            if (this.hitLog != null)
+                this.hitLog.tMarkJump(oldPosition, nNewPosition);
             CSoundManager.rcPerformanceTimer.tReset();
             CSoundManager.rcPerformanceTimer.tPause();
             CSoundManager.rcPerformanceTimer.nCurrentTime = nNewPosition;

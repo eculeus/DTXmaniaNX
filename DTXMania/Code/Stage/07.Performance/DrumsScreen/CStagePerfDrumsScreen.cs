@@ -132,9 +132,19 @@ namespace DTXMania
                 }
             }
             dtLastQueueOperation = DateTime.MinValue;
+
+            // Per-hit timing log (Config.ini [Log] DrumHitLog=1). Null when off, which is the default.
+            base.hitLog = CDrumHitLog.tCreateIfEnabled( base.nInputAdjustTimeMs.Drums );
 		}
 		public override void OnDeactivate()
 		{
+			// Every way out of the performance screen comes through here (clear, fail, Escape, '='
+			// restart), so this is where the hit log is written - on its own thread.
+			if ( base.hitLog != null )
+			{
+				base.hitLog.tFinishAndWrite();
+				base.hitLog = null;
+			}
 			base.OnDeactivate();
 		}
 		public override void OnManagedCreateResources()
@@ -847,6 +857,17 @@ namespace DTXMania
 
         protected override void tHandleInput_Drums()
         {
+            this.tHandleInput_Drums_Pads();
+            if (base.hitLog != null)
+            {
+                // the last event of the frame is finished with; then the notes no pad listens to
+                base.hitLog.tEndInput();
+                base.hitLog.tScanUnassignedMidi(CSoundManager.rcPerformanceTimer.n前回リセットした時のシステム時刻, this.nInputAdjustTimeMs.Drums);
+            }
+        }
+
+        private void tHandleInput_Drums_Pads()
+        {
 
             for (int nPad = 0; nPad < (int)EPad.MAX; nPad++)
             {
@@ -896,6 +917,10 @@ namespace DTXMania
                     long nTime = inputEvent.nTimeStamp - CSoundManager.rcPerformanceTimer.n前回リセットした時のシステム時刻;
                     int nInputAdjustTime = this.bIsAutoPlay[base.nチャンネル0Atoレーン07[nPad]] ? 0 : this.nInputAdjustTimeMs.Drums;
                     int nPedalLagTime = CDTXMania.ConfigIni.nPedalLagTime;
+
+                    // hit log: this event is now current; chips hit for it report back through tProcessChipHit
+                    if (base.hitLog != null)
+                        base.hitLog.tBeginInput((EPad)nPad, inputEvent, nTime, nInputAdjustTime);
 
                     bool bHitted = false;
 

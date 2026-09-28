@@ -758,6 +758,16 @@ namespace DTXMania
                 "to the start of the loop instead of restarting the song. Nothing is scored or saved while a loop is set.");
             this.listItems.Add(this.iDrumsPracticeMode);
 
+            this.iDrumsHitLog = new CItemToggle("HitLog", CDTXMania.ConfigIni.bDrumHitLog,
+                "ONにすると演奏ごとに\n" +
+                "1打ごとのタイミングを\n" +
+                "HitLogs フォルダに\n" +
+                "CSV で保存します。",
+                "Drum hit log. Turn ON and every drums play writes a CSV to the HitLogs folder next to the game when it " +
+                "ends: each pad hit with its timing (early/late in ms) and judgement, each missed note, hits the game " +
+                "ignored and why, and a summary. For checking your timing offset and chart drift. No effect on play.");
+            this.listItems.Add(this.iDrumsHitLog);
+
             this.iDrumsPosition = new CItemList("JudgePosition", CItemBase.EPanelType.Normal, (int)CDTXMania.ConfigIni.JudgementStringPosition.Drums,
                 "ゲーム中に表示される\n"+
                 "判定文字の位置を変更します。\n" +
@@ -3213,6 +3223,7 @@ namespace DTXMania
         private CItemToggle iDrumsNotationStems;
         private CItemToggle iDrumsNotationJudge;
         private CItemToggle iDrumsPracticeMode;
+        private CItemToggle iDrumsHitLog;
         private CItemInteger iDrumsScrollSpeed;
         private CItemToggle iDrumsSnare;
         private CItemToggle iDrumsTight;
@@ -3471,6 +3482,7 @@ namespace DTXMania
             this.iDrumsNotationStems.bON = CDTXMania.ConfigIni.bDrumsNotationStems;
             this.iDrumsNotationJudge.bON = CDTXMania.ConfigIni.bDrumsNotationJudgeColour;
             this.iDrumsPracticeMode.bON = CDTXMania.ConfigIni.bPracticeMode;
+            this.iDrumsHitLog.bON = CDTXMania.ConfigIni.bDrumHitLog;
             this.iDrumsPosition.n現在選択されている項目番号 = (int)CDTXMania.ConfigIni.JudgementStringPosition.Drums;
             this.iDrumsTight.bON = CDTXMania.ConfigIni.bTight;
             this.iDrumsInputAdjustTimeMs.nCurrentValue = CDTXMania.ConfigIni.nInputAdjustTimeMs.Drums;
@@ -3680,6 +3692,7 @@ namespace DTXMania
             CDTXMania.ConfigIni.bDrumsNotationStems = this.iDrumsNotationStems.bON;
             CDTXMania.ConfigIni.bDrumsNotationJudgeColour = this.iDrumsNotationJudge.bON;
             CDTXMania.ConfigIni.bPracticeMode = this.iDrumsPracticeMode.bON;
+            CDTXMania.ConfigIni.bDrumHitLog = this.iDrumsHitLog.bON;
             CDTXMania.ConfigIni.JudgementStringPosition.Drums = (EType)this.iDrumsPosition.n現在選択されている項目番号;
             CDTXMania.ConfigIni.bTight = this.iDrumsTight.bON;
             CDTXMania.ConfigIni.nInputAdjustTimeMs.Drums = this.iDrumsInputAdjustTimeMs.nCurrentValue;		// #23580 2011.1.3 yyagi

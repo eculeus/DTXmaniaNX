@@ -694,6 +694,7 @@ namespace DTXMania
 		public bool bFillInEnabled;
 		public bool bランダムセレクトで子BOXを検索対象とする;
 		public bool bOutputLogs;
+		public bool bDrumHitLog;          // per-hit drum timing log to HitLogs\*.csv (docs/hit-log.md)
 		public STDGBVALUE<bool> b演奏音を強調する;
 		public bool b演奏情報を表示する;
         public bool bAutoAddGage; //2012.9.18
@@ -1415,6 +1416,7 @@ namespace DTXMania
 			this.n自動再生音量 = 80;
 			this.n手動再生音量 = 100;
 			this.bOutputLogs = true;
+			this.bDrumHitLog = false;
             this.b曲名表示をdefのものにする = true;
 			this.b演奏音を強調する = new STDGBVALUE<bool>();
 			this.bSudden = new STDGBVALUE<bool>();
@@ -2081,6 +2083,11 @@ namespace DTXMania
 			sw.WriteLine();
 			sw.WriteLine( "; DTX読み込み詳細に関するLog出力(0:OFF, 1:ON)" );
 			sw.WriteLine( "TraceDTXDetails={0}", this.bLogDTX詳細ログ出力 ? 1 : 0 );
+			sw.WriteLine();
+			sw.WriteLine( "; ドラム演奏の打撃ログ(1打ごとのタイミング)を HitLogs\\*.csv に出力(0:OFF, 1:ON)" );
+			sw.WriteLine( "; Drum hit log: every pad hit and every missed note with its timing, written to" );
+			sw.WriteLine( "; HitLogs\\<date>_<title>_<difficulty>.csv when the song ends (0:OFF, 1:ON). See docs/hit-log.md" );
+			sw.WriteLine( "DrumHitLog={0}", this.bDrumHitLog ? 1 : 0 );
 			sw.WriteLine();
 			sw.WriteLine( ";-------------------" );
 			#endregion
@@ -3279,6 +3286,10 @@ namespace DTXMania
 											else if( str3.Equals( "TraceSongSearch" ) )
 											{
 												this.bLogSongSearch = CConversion.bONorOFF( str4[ 0 ] );
+											}
+											else if( str3.Equals( "DrumHitLog" ) )
+											{
+												this.bDrumHitLog = CConversion.bONorOFF( str4[ 0 ] );
 											}
 											continue;
 										}

@@ -720,6 +720,132 @@ jobs:
           if ($loads -ne 1) { throw "'=' restarted the song instead of rewinding the loop ($loads loads)" }
           if ($frames.Count -lt 10) { throw "the practice run rendered $($frames.Count) frame(s)" }
 
+      # Fifth launch: the per-hit drum log (DrumHitLog=1, off by default). Compact mode, every lane
+      # on auto-play except the snare, which is tapped from the keyboard; Escape then quits the
+      # performance, which is one of the ways out that must write the CSV. The step asserts the file
+      # exists, has the header, the column line, rows for the snare taps, MISSED_CHIP rows for the
+      # snare notes the taps did not land on, and the summary.
+      - name: Hit log - tap the snare, quit with Escape, check the CSV
+        if: always()
+        shell: powershell
+        timeout-minutes: 5
+        run: |
+          $ErrorActionPreference = 'Continue'
+          Add-Type -TypeDefinition (@(
+            'using System;',
+            'using System.Runtime.InteropServices;',
+            'public class Drive3 {',
+            '  [DllImport("user32.dll")] public static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtra);',
+            '  [DllImport("user32.dll")] public static extern uint MapVirtualKey(uint uCode, uint uMapType);',
+            '  [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);',
+            '  public static void Tap(byte vk, int holdMs) {',
+            '    byte sc = (byte)MapVirtualKey(vk, 0);',
+            '    keybd_event(vk, sc, 0, UIntPtr.Zero);',
+            '    System.Threading.Thread.Sleep(holdMs);',
+            '    keybd_event(vk, sc, 2, UIntPtr.Zero);',
+            '  }',
+            '}'
+          ) -join [Environment]::NewLine)
+
+          $game    = Join-Path $PWD 'game'
+          $exe     = Join-Path $game 'DTXManiaNX.exe'
+          $dtx     = Join-Path $PWD 'song\smoke.dtx'
+          $logPath = Join-Path $game 'DTXManiaLog.txt'
+          $hitDir  = Join-Path $game 'HitLogs'
+
+          # The earlier runs all had the option off (its default): none of them may have made the folder.
+          if (Test-Path $hitDir) { throw "HitLogs\ exists before the hit-log run - the option is not off by default" }
+
+          $cfg = @(
+            '; Written by the CI smoke job (hit log run).',
+            '[System]',
+            'DTXPath=',
+            'FullScreen=0', 'WindowWidth=1024', 'WindowHeight=576', 'WindowX=0', 'WindowY=0',
+            'VSyncWait=0', 'SoundDeviceType=0',
+            'Drums=1', 'Guitar=0', 'MovieMode=0', 'AVI=0', 'BGA=0',
+            'TimeStretch=0', 'PlaySpeed=20', 'BGMSound=1', 'MasterVolume=0',
+            '[Log]', 'OutputLog=1',
+            'DrumHitLog=1',                  # <- the feature under test
+            '[PlayOption]',
+            'DrumsNotationView=0',
+            '[AutoPlay]',
+            'LC=1', 'HH=1', 'SD=0', 'BD=1', 'HT=1', 'LT=1',
+            'FT=1', 'CY=1', 'RD=1', 'LP=1', 'LBD=1'
+          )
+          $cfgPath = Join-Path $game 'Config.ini'
+          [System.IO.File]::WriteAllLines($cfgPath, $cfg, (New-Object System.Text.ASCIIEncoding))
+          Remove-Item $logPath -ErrorAction SilentlyContinue
+          Remove-Item (Join-Path $game 'Capture_img') -Recurse -Force -ErrorAction SilentlyContinue
+
+          $env:DTXMANIA_AUTOCAPTURE_MS = '2000'
+          $env:FDK_ALLOW_SILENT_SOUND_DEVICE = '1'
+
+          Write-Host "Launching (hit log, compact mode): $exe `"$dtx`""
+          $proc = Start-Process -FilePath $exe -ArgumentList "`"$dtx`"" -WorkingDirectory $game -PassThru
+
+          # ~18 s of snare taps (VK 0x43 = C = SD's default key), then Escape.
+          $VK_SNARE = 0x43
+          $VK_ESCAPE = 0x1B
+          for ($i = 1; $i -le 72; $i++) {
+            $h = $proc.MainWindowHandle
+            if ($h -ne [IntPtr]::Zero) { [void][Drive3]::SetForegroundWindow($h) }
+            [Drive3]::Tap([byte]$VK_SNARE, 30)
+            Start-Sleep -Milliseconds 220
+            $proc.Refresh()
+            if ($proc.HasExited) { Write-Host "!! exited during play, code $($proc.ExitCode)"; break }
+          }
+          if (-not $proc.HasExited) {
+            $h = $proc.MainWindowHandle
+            if ($h -ne [IntPtr]::Zero) { [void][Drive3]::SetForegroundWindow($h) }
+            Write-Host "pressing Escape"
+            [Drive3]::Tap([byte]$VK_ESCAPE, 80)
+          }
+          # Escape fades out, deactivates the performance screen (which writes the log) and, in
+          # compact mode, closes the window.
+          for ($t = 1; $t -le 20 -and -not $proc.HasExited; $t++) { Start-Sleep -Seconds 1; $proc.Refresh() }
+          Write-Host "exited by itself: $($proc.HasExited)"
+          if (-not $proc.HasExited) { Stop-Process -Id $proc.Id -Force; Start-Sleep -Seconds 2 }
+          Get-Process -Name DTXManiaNX -ErrorAction SilentlyContinue | Stop-Process -Force
+
+          Copy-Item $cfgPath (Join-Path $game 'Config_hitlog.ini') -Force
+          if (Test-Path $logPath) { Copy-Item $logPath (Join-Path $game 'DTXManiaLog_hitlog.txt') -Force }
+          if (Test-Path (Join-Path $game 'Capture_img')) { Move-Item (Join-Path $game 'Capture_img') (Join-Path $game 'Capture_img_hitlog') -Force }
+          $log = Get-Content $logPath -Raw -ErrorAction SilentlyContinue
+          ($log -split "`r?`n") | Where-Object { $_ -match 'DrumHitLog' } | ForEach-Object { Write-Host $_ }
+
+          $files = @(Get-ChildItem $hitDir -Filter *.csv -ErrorAction SilentlyContinue)
+          if ($files.Count -ne 1) { throw "expected exactly one CSV in HitLogs\, found $($files.Count)" }
+          $csv = $files[0]
+          Write-Host "=== $($csv.Name) ($($csv.Length) bytes) ==="
+          $bytes = [System.IO.File]::ReadAllBytes($csv.FullName)
+          if (-not ($bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF)) { throw "the CSV has no UTF-8 BOM" }
+          $lines = [System.IO.File]::ReadAllLines($csv.FullName, [System.Text.Encoding]::UTF8)
+          $lines | Select-Object -First 60 | ForEach-Object { Write-Host $_ }
+          Write-Host '...'
+          $lines | Where-Object { $_ -like '#*' } | Select-Object -Last 25 | ForEach-Object { Write-Host $_ }
+
+          if (-not ($lines[0] -like '# DTXManiaNX drum hit log*')) { throw "first line is not the hit log header" }
+          $colIdx = [array]::IndexOf($lines, ($lines | Where-Object { $_ -like 'song_ms,*' } | Select-Object -First 1))
+          if ($colIdx -lt 0) { throw "no column header line" }
+          $data = $lines[($colIdx + 1)..($lines.Count - 1)] | Where-Object { $_ -notlike '#*' -and $_ -ne '' }
+          $rows = $data | ConvertFrom-Csv -Header ($lines[$colIdx] -split ',')
+          $sd = @($rows | Where-Object { $_.pad -eq 'SD' -and $_.input_id -ne '' })
+          $missed = @($rows | Where-Object { $_.outcome -eq 'MISSED_CHIP' })
+          $hits = @($rows | Where-Object { $_.outcome -eq 'HIT' })
+          Write-Host ("rows: {0}; SD inputs: {1}; HIT: {2}; MISSED_CHIP: {3}" -f @($rows).Count, $sd.Count, $hits.Count, $missed.Count)
+          $rows | Group-Object outcome | Select-Object Name, Count | Format-Table | Out-String | Write-Host
+          if ($sd.Count -lt 20) { throw "only $($sd.Count) snare input rows for ~70 taps" }
+          if (@($sd | Where-Object { $_.device -ne 'Keyboard' }).Count -gt 0) { throw "a snare tap was not attributed to the keyboard" }
+          if ($missed.Count -lt 1) { throw "no MISSED_CHIP rows, though most snare notes cannot have been hit" }
+          if (@($rows | Where-Object { $_.outcome -eq 'HIT' -and $_.pad -ne 'SD' }).Count -gt 0) { throw "a HIT row on an auto-played pad" }
+          foreach ($hr in $hits) {
+            # lag must be exactly song_ms + input_adjust - chip_ms, the judgement's own arithmetic
+            if ([int]$hr.lag_ms -ne ([int]$hr.song_ms + [int]$hr.input_adjust_ms - [int]$hr.chip_ms)) { throw "lag arithmetic mismatch in row: $hr" }
+          }
+          if (-not ($lines | Where-Object { $_ -like '# SUMMARY*' })) { throw "no summary" }
+          if ($log -notmatch 'DrumHitLog: wrote') { throw "the game log does not report the write" }
+          Write-Host "hit log OK"
+
       - name: Show DTXManiaLog.txt
         if: always()
         shell: pwsh
@@ -739,6 +865,7 @@ jobs:
             game/Capture_img*/**
             game/DTXManiaLog*.txt
             game/Config*.ini
+            game/HitLogs/**
             song/*.dtx
             song/set.def
             song/sections.def
