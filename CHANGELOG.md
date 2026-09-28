@@ -41,7 +41,7 @@ bindings and settings are kept.
   and a check of the CSV (one file, BOM, header, a row per tap, missed-note rows, the lag
   arithmetic on every hit, the summary), and it now asserts the earlier runs, with the option at
   its default, made no `HitLogs` folder.
-- **Drum judgement windows in the menu.** `Config > Drums`, right after `InputAdjust`:
+- **Drum judgement windows in the menu.** `Config > Drums`, just below `InputAdjust`:
   `PerfectRange`, `GreatRange`, `GoodRange`, `PoorRange` for the pads and `PedalPerfect`,
   `PedalGreat`, `PedalGood`, `PedalPoor` for the pedals (BD, LP, LBD) — the ± ms around a note
   within which a hit counts as that judgement. They are the existing `[HitRange]` keys
@@ -59,6 +59,24 @@ bindings and settings are kept.
   `#PERFECTRANGE`, ...) still overrides these for that folder. Changes apply from the next song
   played; `Config.ini` is written with the same `[HitRange]` keys as before, so it stays readable by
   upstream, and with the items left alone the file and the judgement are exactly as before.
+- **Timing calibration.** `Config > Drums > Calibrate...` (right after `InputAdjust`): a click at
+  120 BPM, 4 count-in clicks, then 24 hits on any pad. It shows each hit early/late in ms, the
+  running median and spread, and every hit on a ±150 ms line against the Perfect window; at the
+  end it suggests the `InputAdjust` that centres the median and offers **Apply** (sets
+  `InputAdjust`; saved to `Config.ini` with the rest when CONFIG closes), **Retry** and
+  **Cancel**/Esc (nothing changes).
+- Why: `InputAdjust` was a number to guess and then check by playing a song. This measures it the
+  way Melodics does, with the game's own clock: hits are timed by the input event's timestamp
+  (what the judgement uses, not frame time) against a click played through the normal sound
+  output and pinned to the performance timer like the BGM, so output and input latency and your
+  own habit are all in it. Display latency is not. Hits over ±150 ms are ignored, strays beyond
+  3 MAD dropped, and the suggestion is `-median` (the judgement's `lag = hit + InputAdjust - note`,
+  with raw offsets), clamped to ±99; fewer than 8 usable hits gives no suggestion.
+- Details, including what it does and does not measure: `docs/calibration.md`. The arithmetic and
+  the click WAV are checked by a new CI step (`Tests/Calibration`), and the smoke test has a
+  sixth run that walks title → CONFIG → Drums → Calibrate..., taps the snare key on a grid about
+  60 ms behind the clicks, applies the result and checks `Config.ini` gets it, with the
+  `[HitRange]` values (one non-default) written back unchanged.
 
 ## 1.5.0-beta.18 — 2026-09-19
 

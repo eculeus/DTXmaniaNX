@@ -4,7 +4,8 @@ standard notation positions, colours per instrument and beams), an in-play **Ski
 keeps the score valid, **named multi-player high scores** shown on the result and song-select
 screens, a **per-hit drum timing log** (a CSV per play, for timing offset, chart drift and hits
 that did not register; see [docs/hit-log.md](docs/hit-log.md)), the **drum judgement windows**
-(Perfect/Great/Good/Poor ± ms, pads and pedals) in `Config > Drums`, and two crash fixes. All of it
+(Perfect/Great/Good/Poor ± ms, pads and pedals) in `Config > Drums`, a Melodics-style **timing
+calibration** that suggests `InputAdjust` (see [docs/calibration.md](docs/calibration.md)), and two crash fixes. All of it
 is optional and off by default, so an upstream `Config.ini` keeps working. Details and per-version notes are in [CHANGELOG.md](CHANGELOG.md);
 builds are on the [releases page](https://github.com/eculeus/DTXmaniaNX/releases) and as
 artifacts of every GitHub Actions run.
