@@ -9,7 +9,7 @@ Builds are produced by GitHub Actions (`.github/workflows/build.yml`, Release x8
 extracting the zip over an existing DTXManiaNX folder; `Config.ini` is not included, so key
 bindings and settings are kept.
 
-## Unreleased
+## 1.5.0-beta.19 — 2026-09-28
 
 - **Drum hit log.** `Config > Drums > HitLog` (`DrumHitLog=` in `[Log]`, off by default). With
   it on, every drums play writes a CSV of what happened on the kit to
