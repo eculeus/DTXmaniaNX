@@ -39,6 +39,18 @@ jobs:
           & $exe
           if ($LASTEXITCODE -ne 0) { throw "routing checks FAILED" }
 
+      # The calibration arithmetic (Config > Drums > Calibrate): pairing hits with clicks, the
+      # outlier rules, the InputAdjust suggestion and the click WAV. Game-free, so it runs here.
+      - name: Calibration arithmetic checks
+        shell: pwsh
+        run: |
+          $csc = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
+          $exe = Join-Path $env:RUNNER_TEMP 'calib.exe'
+          & $csc /nologo /langversion:5 "/out:$exe" Tests\Calibration\CalibrationTests.cs DTXMania\Code\Stage\04.Config\CCalibrationMath.cs
+          if ($LASTEXITCODE -ne 0) { throw "the calibration harness did not compile" }
+          & $exe
+          if ($LASTEXITCODE -ne 0) { throw "calibration checks FAILED" }
+
       - name: Package runtime
         shell: pwsh
         run: |
@@ -845,6 +857,142 @@ jobs:
           if (-not ($lines | Where-Object { $_ -like '# SUMMARY*' })) { throw "no summary" }
           if ($log -notmatch 'DrumHitLog: wrote') { throw "the game log does not report the write" }
           Write-Host "hit log OK"
+
+      # Sixth launch: the timing calibration. Boots to the title screen, walks into CONFIG >
+      # Drums > Calibrate..., taps the snare key on a 500 ms grid set 60 ms after the click grid
+      # would be if the game started it the instant Enter went down (it starts a frame or so
+      # later, so the measured offset is a little under +60), waits for the result, Applies it,
+      # leaves CONFIG (which writes Config.ini) and checks that InputAdjustTimeDrums holds the
+      # suggestion and that the [HitRange] values - one of them non-default - came back unchanged.
+      - name: Calibration - CONFIG > Drums > Calibrate, Apply, check Config.ini
+        if: always()
+        shell: powershell
+        timeout-minutes: 6
+        run: |
+          $ErrorActionPreference = 'Continue'
+          Add-Type -TypeDefinition (@(
+            'using System;',
+            'using System.Runtime.InteropServices;',
+            'public class Drive4 {',
+            '  [DllImport("user32.dll")] public static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtra);',
+            '  [DllImport("user32.dll")] public static extern uint MapVirtualKey(uint uCode, uint uMapType);',
+            '  [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);',
+            '  // arrow keys are extended keys; without the flag DirectInput sees the num-pad scan code',
+            '  public static void Down(byte vk, bool ext) { keybd_event(vk, (byte)MapVirtualKey(vk, 0), ext ? 1u : 0u, UIntPtr.Zero); }',
+            '  public static void Up(byte vk, bool ext)   { keybd_event(vk, (byte)MapVirtualKey(vk, 0), ext ? 3u : 2u, UIntPtr.Zero); }',
+            '  public static void Tap(byte vk, int holdMs, bool ext) { Down(vk, ext); System.Threading.Thread.Sleep(holdMs); Up(vk, ext); }',
+            '}'
+          ) -join [Environment]::NewLine)
+
+          $game    = Join-Path $PWD 'game'
+          $exe     = Join-Path $game 'DTXManiaNX.exe'
+          $songDir = Join-Path $PWD 'song'
+          $logPath = Join-Path $game 'DTXManiaLog.txt'
+          function Read-GameLog([string]$path) {
+            if (-not (Test-Path $path)) { return '' }
+            try {
+              $fs = [System.IO.File]::Open($path, 'Open', 'Read', 'ReadWrite')
+              $sr = New-Object System.IO.StreamReader($fs)
+              $t = $sr.ReadToEnd(); $sr.Close(); $fs.Close(); return $t
+            } catch { return '' }
+          }
+
+          $cfg = @(
+            '; Written by the CI smoke job (calibration run).',
+            '[System]',
+            "DTXPath=$songDir",
+            'FullScreen=0', 'WindowWidth=1024', 'WindowHeight=576', 'WindowX=0', 'WindowY=0',
+            'VSyncWait=0', 'SoundDeviceType=0',
+            'Drums=1', 'Guitar=0', 'MovieMode=0', 'AVI=0', 'BGA=0', 'BGMSound=1', 'MasterVolume=0',
+            '[Log]', 'OutputLog=1',
+            '[HitRange]',
+            'DrumPerfect=40',                # non-default: must survive CONFIG untouched
+            'DrumGreat=67', 'DrumGood=84', 'DrumPoor=117',
+            'DrumPedalPerfect=34', 'DrumPedalGreat=67', 'DrumPedalGood=84', 'DrumPedalPoor=117'
+          )
+          $cfgPath = Join-Path $game 'Config.ini'
+          [System.IO.File]::WriteAllLines($cfgPath, $cfg, (New-Object System.Text.ASCIIEncoding))
+          Remove-Item $logPath -ErrorAction SilentlyContinue
+          Remove-Item (Join-Path $game 'Capture_img') -Recurse -Force -ErrorAction SilentlyContinue
+          $env:DTXMANIA_AUTOCAPTURE_MS = '1000'
+          $env:FDK_ALLOW_SILENT_SOUND_DEVICE = '1'
+
+          $VK_RETURN = 0x0D; $VK_ESCAPE = 0x1B; $VK_UP = 0x26; $VK_DOWN = 0x28; $VK_SNARE = 0x43
+          $proc = Start-Process -FilePath $exe -WorkingDirectory $game -PassThru
+          function Focus-Game { $h = $proc.MainWindowHandle; if ($h -ne [IntPtr]::Zero) { [void][Drive4]::SetForegroundWindow($h) } }
+          function Wait-Log([string]$pattern, [int]$seconds) {
+            for ($t = 0; $t -lt $seconds * 4; $t++) {
+              if ((Read-GameLog $logPath) -match $pattern) { return $true }
+              $proc.Refresh(); if ($proc.HasExited) { return $false }
+              Start-Sleep -Milliseconds 250
+            }
+            return $false
+          }
+
+          $ok = $false
+          try {
+            if (-not (Wait-Log '(?m)\sTitle\s*$' 30)) { throw "never reached the title screen" }
+            Start-Sleep -Seconds 3
+            Focus-Game
+            [Drive4]::Tap([byte]$VK_DOWN, 60, $true); Start-Sleep -Milliseconds 400      # GAME START -> CONFIG
+            [Drive4]::Tap([byte]$VK_RETURN, 60, $false)
+            if (-not (Wait-Log '(?m)\sConfig\s*$' 15)) { throw "never reached CONFIG" }
+            Start-Sleep -Seconds 3
+            Focus-Game
+            [Drive4]::Tap([byte]$VK_DOWN, 60, $true); Start-Sleep -Milliseconds 600      # System -> Drums
+            [Drive4]::Tap([byte]$VK_RETURN, 60, $false); Start-Sleep -Milliseconds 600   # into the item list
+            # Up from the top wraps: Drums Keys, the 8 window items, then Calibrate... is the 10th.
+            for ($i = 1; $i -le 10; $i++) { [Drive4]::Tap([byte]$VK_UP, 40, $true); Start-Sleep -Milliseconds 250 }
+            Start-Sleep -Milliseconds 800
+            Focus-Game
+            $sw = [System.Diagnostics.Stopwatch]::StartNew()
+            [Drive4]::Tap([byte]$VK_RETURN, 30, $false)                                   # start: first click 1000 ms later
+            # 4 count-in taps (ignored) + 30: the screen stops at 24 counted hits
+            for ($k = 0; $k -lt 34; $k++) {
+              $target = 1000 + 60 + 500 * $k
+              while ($sw.ElapsedMilliseconds -lt $target) { Start-Sleep -Milliseconds 1 }
+              [Drive4]::Tap([byte]$VK_SNARE, 30, $false)
+            }
+            if (-not (Wait-Log 'Calibration: accepted' 10)) { throw "the calibration never finished - see DTXManiaLog_calibration.txt" }
+            Start-Sleep -Milliseconds 2500                                                 # results screen in the frames
+            Focus-Game
+            [Drive4]::Tap([byte]$VK_RETURN, 60, $false)                                   # Apply (the default)
+            if (-not (Wait-Log 'Calibration: applied' 5)) { throw "Apply was not taken" }
+            Start-Sleep -Milliseconds 800
+            [Drive4]::Tap([byte]$VK_ESCAPE, 60, $false); Start-Sleep -Milliseconds 800    # items -> menu
+            [Drive4]::Tap([byte]$VK_ESCAPE, 60, $false)                                   # leave CONFIG: writes Config.ini
+            for ($t = 0; $t -lt 40; $t++) {
+              if (([regex]::Matches((Read-GameLog $logPath), '(?m)\sTitle\s*$')).Count -ge 2) { break }
+              Start-Sleep -Milliseconds 250
+            }
+            $ok = $true
+          } finally {
+            Start-Sleep -Seconds 1
+            if (-not $proc.HasExited) { Stop-Process -Id $proc.Id -Force; Start-Sleep -Seconds 2 }
+            Get-Process -Name DTXManiaNX -ErrorAction SilentlyContinue | Stop-Process -Force
+            Copy-Item $cfgPath (Join-Path $game 'Config_calibration.ini') -Force
+            if (Test-Path $logPath) { Copy-Item $logPath (Join-Path $game 'DTXManiaLog_calibration.txt') -Force }
+            if (Test-Path (Join-Path $game 'Capture_img')) { Move-Item (Join-Path $game 'Capture_img') (Join-Path $game 'Capture_img_calibration') -Force }
+          }
+
+          $log = Read-GameLog (Join-Path $game 'DTXManiaLog_calibration.txt')
+          ($log -split "`r?`n") | Where-Object { $_ -match 'Calibration' } | ForEach-Object { Write-Host $_ }
+          $m = [regex]::Match($log, 'Calibration: accepted (\d+), rejected (\d+), used (\d+), median (-?[\d.]+) ms, MAD ([\d.]+) ms, SD ([\d.]+) ms, suggested InputAdjustTimeDrums=(-?\d+)')
+          if (-not $m.Success) { throw "no calibration summary in the log" }
+          $used = [int]$m.Groups[3].Value; $median = [double]$m.Groups[4].Value; $suggest = [int]$m.Groups[7].Value
+          Write-Host "used $used, median $median ms, suggested $suggest"
+          if ($used -lt 20) { throw "only $used of 24 hits were used" }
+          if ($median -lt 0 -or $median -gt 110) { throw "median $median ms: the taps were injected ~60 ms late, a little less after the frame the game starts on" }
+          if ($suggest -ne -[int][Math]::Round($median, [MidpointRounding]::AwayFromZero) -and $suggest -ne -99) { throw "suggestion $suggest is not -median" }
+
+          $ini = Get-Content (Join-Path $game 'Config_calibration.ini')
+          $ini | Where-Object { $_ -match '^(InputAdjustTimeDrums|Drum(Pedal)?(Perfect|Great|Good|Poor))=' } | ForEach-Object { Write-Host $_ }
+          if (-not ($ini -contains "InputAdjustTimeDrums=$suggest")) { throw "Config.ini does not have InputAdjustTimeDrums=$suggest" }
+          foreach ($kv in 'DrumPerfect=40', 'DrumGreat=67', 'DrumGood=84', 'DrumPoor=117', 'DrumPedalPerfect=34', 'DrumPedalGreat=67', 'DrumPedalGood=84', 'DrumPedalPoor=117') {
+            if (-not ($ini -contains $kv)) { throw "Config.ini lost $kv through CONFIG" }
+          }
+          if (-not $ok) { throw "the calibration run did not complete" }
+          Write-Host "calibration OK"
 
       - name: Show DTXManiaLog.txt
         if: always()
