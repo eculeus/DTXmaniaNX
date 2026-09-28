@@ -9,6 +9,39 @@ Builds are produced by GitHub Actions (`.github/workflows/build.yml`, Release x8
 extracting the zip over an existing DTXManiaNX folder; `Config.ini` is not included, so key
 bindings and settings are kept.
 
+## Unreleased
+
+- **Drum hit log.** `Config > Drums > HitLog` (`DrumHitLog=` in `[Log]`, off by default). With
+  it on, every drums play writes a CSV of what happened on the kit to
+  `HitLogs\<yyyyMMdd-HHmmss>_<title>_<difficulty>.csv` next to the game when the performance
+  ends — stage clear, stage failed, Escape or `=` restart; a practice-loop session is one file
+  with each lap as a new segment. UTF-8 with a BOM, so Excel opens it directly.
+- Why: the result screen gives totals, and totals cannot say whether you are consistently early
+  or late, whether the chart drifts against the record, or why one particular hit did nothing.
+  One row per event can.
+- One row per pad input: `song_ms` (the judgement's own clock), pad, device (`MIDI<n>` /
+  `Keyboard` / `Joypad<n>`), MIDI note or key code, velocity, `outcome`, and for a hit the chip's
+  lane (`11`, `18`, `1A`...), time, `.dtx` file bar and meter-aware beat, the judgement and
+  `lag_ms` — `hit + input adjust - chip`, exactly the judgement's arithmetic, **+ late, - early**.
+  An input that took no chip says why: velocity at or below `VelocityMin` (`IGNORED_VELOCITY`),
+  or `NO_CHIP_IN_RANGE` with the nearest chip on that pad's lanes and whether it was already hit
+  (double trigger), outside the Poor window, or on a lane the group settings keep that pad off.
+- One row per note that went by unhit (`MISSED_CHIP`) or was jumped with Skip (`SKIPPED_CHIP`),
+  one per MIDI note-on that no drum pad is bound to (`UNASSIGNED_NOTE` — the rim, bell or choke
+  zone the game silently ignores), and a `SEEK` row at every loop lap or seek.
+- A header with the settings the numbers depend on (input adjust, BGM adjust, hit ranges,
+  VelocityMin per pad, HH/FT/CY/BD groups, play speed, MIDI devices and every MIDI note bound to a
+  pad), and a summary: per pad and per lane the judgement counts and the mean, median, spread and
+  mean absolute lag, and the mean lag per 16 bars to show drift.
+- Nothing about play changes. The log only reads what the judgement has already decided, keeps
+  rows in memory during the song, and writes the file on a worker thread afterwards; with the
+  option off it does not exist. Column definitions and how to read the numbers are in
+  `docs/hit-log.md`.
+- The smoke test has a fifth run: the snare tapped from the keyboard with the option on, Escape,
+  and a check of the CSV (one file, BOM, header, a row per tap, missed-note rows, the lag
+  arithmetic on every hit, the summary), and it now asserts the earlier runs, with the option at
+  its default, made no `HitLogs` folder.
+
 ## 1.5.0-beta.18 — 2026-09-19
 
 - The practice panel opens with **`/`**. Shift+F2 was only ever chosen because upstream reserved
