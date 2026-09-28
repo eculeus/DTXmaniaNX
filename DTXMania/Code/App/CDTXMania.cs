@@ -226,6 +226,20 @@ namespace DTXMania
             get;
             private set;
         }
+        /// <summary>
+        /// Leaving a performance for song select (clear via the result screen, fail, Escape; not '='
+        /// restart, and practice laps never leave): PlaySpeed back to x1.0 unless
+        /// ResetPlaySpeedOnExit=0, so a song practised slowly does not leave the next one slowed.
+        /// </summary>
+        private void tResetPlaySpeedAfterPerformance(string strWhy)
+        {
+            if (!ConfigIni.bResetPlaySpeedOnExit || DTXVmode.Enabled || DTX2WAVmode.Enabled || ConfigIni.nPlaySpeed == 20)
+                return;
+            Trace.TraceInformation("PlaySpeed reset to x1.000 (was {0}, x{1:0.000}) on leaving the performance ({2}).",
+                ConfigIni.nPlaySpeed, ConfigIni.nPlaySpeed / 20.0, strWhy);
+            ConfigIni.nPlaySpeed = 20;
+        }
+
         public static CStageConfig stageConfig
         {
             get;
@@ -1345,6 +1359,8 @@ for (int i = 0; i < 3; i++) {
                                 DTX.tStopPlayingAllChips();
                                 DTX.OnDeactivate();
                                 rCurrentStage.OnDeactivate();
+                                if (this.nUpdateAndDrawReturnValue != (int)EPerfScreenReturnValue.Restart)
+                                    this.tResetPlaySpeedAfterPerformance("quit");
                                 if (bCompactMode && !DTXVmode.Enabled && !DTX2WAVmode.Enabled)
                                 {
                                     base.Window.Close();
@@ -1547,6 +1563,7 @@ for (int i = 0; i < 3; i++) {
                                 DTX.tStopPlayingAllChips();
                                 DTX.OnDeactivate();
                                 rCurrentStage.OnDeactivate();
+                                this.tResetPlaySpeedAfterPerformance("stage failed");
                                 if (bCompactMode)
                                 {
                                     base.Window.Close();
@@ -1726,6 +1743,7 @@ for (int i = 0; i < 3; i++) {
                             DTX.tPausePlaybackForAllChips();
                             DTX.OnDeactivate();
                             rCurrentStage.OnDeactivate();
+                            this.tResetPlaySpeedAfterPerformance("result screen closed");	// after the result, which judges the play by its speed
                             if (!bCompactMode)
                             {
                                 Trace.TraceInformation("----------------------");

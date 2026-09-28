@@ -759,6 +759,7 @@ namespace DTXMania
 		public int nフレーム毎スリープms;			// #xxxxx 2011.11.27 yyagi add
 		public int nPlaySpeed;
 		public bool bSaveScoreIfModifiedPlaySpeed;
+		public bool bResetPlaySpeedOnExit;    // PlaySpeed back to x1.0 when a performance is left for song select (ResetPlaySpeedOnExit)
 		public int n曲が選択されてからプレビュー音が鳴るまでのウェイトms;
 		public int n曲が選択されてからプレビュー画像が表示開始されるまでのウェイトms;
 		public int n自動再生音量;  // nAutoVolume
@@ -1456,6 +1457,7 @@ namespace DTXMania
 			}
 			this.nPlaySpeed = 20;
 			this.bSaveScoreIfModifiedPlaySpeed = false;
+			this.bResetPlaySpeedOnExit = true;
 			this.bSmallGraph = true;
             this.ドラムコンボ文字の表示位置 = EDrumComboTextDisplayPosition.RIGHT;
             this.bドラムコンボ文字の表示 = true;
@@ -2173,6 +2175,10 @@ namespace DTXMania
 			sw.WriteLine();
 			sw.WriteLine("; Save score when PlaySpeed is not 100% (0:OFF, 1:ON)");
 			sw.WriteLine("SaveScoreIfModifiedPlaySpeed={0}", this.bSaveScoreIfModifiedPlaySpeed ? 1 : 0);
+			sw.WriteLine();
+			sw.WriteLine("; 演奏を終えて選曲画面に戻るとき、演奏速度を x1.0 に戻す (0:OFF, 1:ON)");
+			sw.WriteLine("; Reset PlaySpeed to x1.0 when a performance ends and the game returns to song select (0:OFF, 1:ON)");
+			sw.WriteLine("ResetPlaySpeedOnExit={0}", this.bResetPlaySpeedOnExit ? 1 : 0);
 			sw.WriteLine();
 
 			// #24074 2011.01.23 add ikanick
@@ -3440,6 +3446,10 @@ namespace DTXMania
 											else if( str3.Equals( "PlaySpeed" ) )
 											{
 												this.nPlaySpeed = CConversion.nGetNumberIfInRange( str4, CConstants.PLAYSPEED_MIN, CConstants.PLAYSPEED_MAX, this.nPlaySpeed );
+											}
+											else if (str3.Equals("ResetPlaySpeedOnExit"))
+											{
+												this.bResetPlaySpeedOnExit = CConversion.bONorOFF(str4[0]);
 											}
 											else if (str3.Equals("SaveScoreIfModifiedPlaySpeed"))
 											{

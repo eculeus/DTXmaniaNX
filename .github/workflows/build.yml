@@ -785,10 +785,11 @@ jobs:
             'FullScreen=0', 'WindowWidth=1024', 'WindowHeight=576', 'WindowX=0', 'WindowY=0',
             'VSyncWait=0', 'SoundDeviceType=0',
             'Drums=1', 'Guitar=0', 'MovieMode=0', 'AVI=0', 'BGA=0',
-            'TimeStretch=0', 'PlaySpeed=20', 'BGMSound=1', 'MasterVolume=0',
+            'TimeStretch=0', 'BGMSound=1', 'MasterVolume=0',
             '[Log]', 'OutputLog=1',
             'DrumHitLog=1',                  # <- the feature under test
             '[PlayOption]',
+            'PlaySpeed=18',                  # x0.9: the header must record it, and Escape must reset it to 20
             'DrumsNotationView=0',
             '[AutoPlay]',
             'LC=1', 'HH=1', 'SD=0', 'BD=1', 'HT=1', 'LT=1',
@@ -869,6 +870,14 @@ jobs:
           }
           if (-not ($lines | Where-Object { $_ -like '# SUMMARY*' })) { throw "no summary" }
           if ($log -notmatch 'DrumHitLog: wrote') { throw "the game log does not report the write" }
+          # PlaySpeed: the header has the speed the play ran at; leaving it (Escape) put it back to x1.0
+          $ps = $lines | Where-Object { $_ -like '# play_speed:*' } | Select-Object -First 1
+          Write-Host "header: $ps"
+          if ($ps -notmatch '0\.900 \(PlaySpeed=18\)') { throw "the hit log header does not record PlaySpeed=18: $ps" }
+          $iniHit = Get-Content $cfgPath
+          $iniHit | Where-Object { $_ -match '^(PlaySpeed|ResetPlaySpeedOnExit|InputAdjustInPlay)=' } | ForEach-Object { Write-Host "Config.ini after the run: $_" }
+          if (-not ($iniHit -contains 'PlaySpeed=20')) { throw "PlaySpeed was not reset to 20 on leaving the performance" }
+          if ($log -notmatch 'PlaySpeed reset to x1\.000 \(was 18') { throw "no PlaySpeed reset line in the log" }
           $adj = @([regex]::Matches($log, 'InputAdjust \(Drums\) changed in play: (-?\d+) ms') | ForEach-Object { $_.Groups[1].Value })
           Write-Host "in-play InputAdjust changes: $($adj -join ', ')"
           if ($adj.Count -ne 1 -or $adj[0] -ne '10') { throw "expected exactly one in-play change, to +10 (plain Left must do nothing, Shift+Right +10); got: $($adj -join ', ')" }

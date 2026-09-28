@@ -86,6 +86,16 @@ bindings and settings are kept.
   Shift+Left/Right had no other binding in the performance screen (Shift+Up/Down is BGMAdjust).
 - `InputAdjustInPlay=0` in `[System]` (next to `InputAdjustTimeDrums`), or `Config > Drums > AdjustInPlay` OFF, turns in-play
   changes off entirely (default ON, with the Shift requirement).
+- **Play speed goes back to x1.0 after a song.** A slowed-down PlaySpeed used to stay for every
+  song after it until changed by hand. Now it resets to x1.000 whenever a performance ends and the
+  game returns to song select — after the result screen on a clear (the result still judges the
+  play at the speed it ran at), on a fail, and on Escape — so the next song starts at normal
+  speed and song select / the practice panel show x1.0. Within one performance nothing changes:
+  practice-loop laps and `=` restarts of the same song keep the slowed speed, since practising
+  slowly is the point. The hit log header records the speed the play actually ran at.
+  `ResetPlaySpeedOnExit=0` in `[PlayOption]`, or `Config > System > ResetSpeed` OFF, keeps the
+  old behaviour (default ON). The hit-log smoke run now plays at PlaySpeed=18 and checks the header
+  says 0.900 and that `Config.ini` has `PlaySpeed=20` after Escape.
 
 ## 1.5.0-beta.18 — 2026-09-19
 

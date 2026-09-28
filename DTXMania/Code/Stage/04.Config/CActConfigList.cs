@@ -143,6 +143,17 @@ namespace DTXMania
                 "Change the song speed.\nFor example, you can play in half speed by setting PlaySpeed = 0.500 for practice.\nNote: It also changes the song's pitch.");
             this.listItems.Add(this.iCommonPlaySpeed);
 
+            this.iSystemResetPlaySpeed = new CItemToggle("ResetSpeed", CDTXMania.ConfigIni.bResetPlaySpeedOnExit,
+                "ONにすると、演奏を終えて\n" +
+                "選曲画面に戻るときに\n" +
+                "演奏速度を x1.0 に戻します。\n" +
+                "(同じ曲のリスタートや\n" +
+                "練習ループ中は変わりません)",
+                "ON: PlaySpeed goes back to x1.000 whenever a performance ends and the game returns to song select " +
+                "(clear, fail, Escape), so the next song starts at normal speed. Restarting the same song and " +
+                "practice-loop laps keep the slowed speed. OFF: the speed stays until you change it.");
+            this.listItems.Add(this.iSystemResetPlaySpeed);
+
             this.iSystemTimeStretch = new CItemToggle("TimeStretch", CDTXMania.ConfigIni.bTimeStretch,
                 "演奏速度の変更方式:\n" +
                 "ONにすると、\n"+
@@ -3330,6 +3341,7 @@ namespace DTXMania
         private CItemToggle iBassGraph;
 
         private CItemInteger iCommonPlaySpeed;
+        private CItemToggle iSystemResetPlaySpeed;
         //		private CItemBase iCommonReturnToMenu;
 
         private CItemThreeState iDrumsAutoPlayAll;
@@ -3452,6 +3464,7 @@ namespace DTXMania
             #region [ System Configuration ]
 
             this.iCommonPlaySpeed.nCurrentValue = CDTXMania.ConfigIni.nPlaySpeed;
+            this.iSystemResetPlaySpeed.bON = CDTXMania.ConfigIni.bResetPlaySpeedOnExit;
             int nDGmode = (CDTXMania.ConfigIni.bGuitarEnabled ? 1 : 1) + (CDTXMania.ConfigIni.bDrumsEnabled ? 0 : 1) - 1;
             this.iSystemGRmode.n現在選択されている項目番号 = nDGmode;
 
@@ -3708,6 +3721,7 @@ namespace DTXMania
         {
             //CDTXMania.ConfigIni.eDark = (EDarkMode) this.iCommonDark.n現在選択されている項目番号;
             CDTXMania.ConfigIni.nPlaySpeed = this.iCommonPlaySpeed.nCurrentValue;
+            CDTXMania.ConfigIni.bResetPlaySpeedOnExit = this.iSystemResetPlaySpeed.bON;
 
             CDTXMania.ConfigIni.bGuitarEnabled = (((this.iSystemGRmode.n現在選択されている項目番号 + 1) / 2) == 1);
             //this.iSystemGuitar.bON;
