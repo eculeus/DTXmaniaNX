@@ -1148,6 +1148,14 @@ namespace DTXMania
                 "To decrease input lag, set minus value.");
             this.listItems.Add(this.iDrumsInputAdjustTimeMs);
 
+            // Judgement windows: [HitRange] DrumPerfect..DrumPoor and DrumPedalPerfect..DrumPedalPoor.
+            // Rule: Perfect <= Great <= Good <= Poor. An item being changed is clamped between its
+            // neighbours (tClampHitRangeItem); values read from Config.ini are shown and saved as-is.
+            this.iDrumsHitRanges = this.tCreateHitRangeItems(CDTXMania.ConfigIni.stDrumHitRanges, false);
+            this.iDrumsPedalHitRanges = this.tCreateHitRangeItems(CDTXMania.ConfigIni.stDrumPedalHitRanges, true);
+            this.listItems.AddRange(this.iDrumsHitRanges);
+            this.listItems.AddRange(this.iDrumsPedalHitRanges);
+
             this.iDrumsGoToKeyAssign = new CItemBase("Drums Keys", CItemBase.EPanelType.Normal,
                 "ドラムのキー入力に関する項目を設定します。",
                 "Settings for the drums key/pad inputs.");
@@ -2409,7 +2417,94 @@ namespace DTXMania
             {
                 CDTXMania.SoundManager.nMasterVolume = this.iSystemMasterVolume.nCurrentValue;
             }
+            else
+            {
+                this.tClampHitRangeItem(this.iDrumsHitRanges);
+                this.tClampHitRangeItem(this.iDrumsPedalHitRanges);
+            }
         }
+
+        #region [ Drum judgement windows ([HitRange]) ]
+        // Menu ranges. Config.ini accepts 0-999; a value outside these from a hand-edited ini is
+        // shown and saved unchanged, and only moves into range once the item is changed here.
+        private static readonly int[] nHitRangeMinMs = { 10, 10, 10, 10 };
+        private static readonly int[] nHitRangeMaxMs = { 100, 200, 200, 200 };
+        private static readonly string[] strHitRangeJudgeNames = { "Perfect", "Great", "Good", "Poor" };
+
+        /// <summary>
+        /// Build the four judgement-window items (Perfect, Great, Good, Poor) for drum pads or pedals.
+        /// </summary>
+        private CItemInteger[] tCreateHitRangeItems(STHitRanges st, bool bPedal)
+        {
+            STHitRanges stDefault = STHitRanges.tCreateDefaultDTXHitRanges();
+            int[] nValues = { st.nPerfectSizeMs, st.nGreatSizeMs, st.nGoodSizeMs, st.nPoorSizeMs };
+            int[] nDefaults = { stDefault.nPerfectSizeMs, stDefault.nGreatSizeMs, stDefault.nGoodSizeMs, stDefault.nPoorSizeMs };
+            string strIniPrefix = bPedal ? "DrumPedal" : "Drum";
+            string strBoxPrefix = bPedal ? "DRUMPEDAL" : "DRUM";
+            string strPartJp = bPedal ? "ペダル(BD/LP/LBD)" : "パッド(ペダル以外)";
+            string strPartEn = bPedal ? "the pedals (BD, LP, LBD)" : "the pads (all lanes but pedals)";
+
+            var items = new CItemInteger[4];
+            for (int i = 0; i < 4; i++)
+            {
+                string strJudge = strHitRangeJudgeNames[i];
+                string strName = bPedal ? ("Pedal" + strJudge) : (strJudge + "Range");
+                string strOrderJp = (i == 0) ? "Great 以下" : (i == 3) ? "Good 以上" : $"{strHitRangeJudgeNames[i - 1]} 以上 {strHitRangeJudgeNames[i + 1]} 以下";
+                string strOrderEn = (i == 0) ? "It cannot go above Great; widen Great first."
+                                  : (i == 3) ? "It cannot go below Good."
+                                  : $"It stays between {strHitRangeJudgeNames[i - 1]} and {strHitRangeJudgeNames[i + 1]}.";
+                items[i] = new CItemInteger(strName, nHitRangeMinMs[i], nHitRangeMaxMs[i], nValues[i],
+                    $"{strPartJp}の {strJudge} 判定の幅\n" +
+                    $"(ノーツの前後 ±ms)。\n" +
+                    $"初期値 {nDefaults[i]}ms。\n" +
+                    $"{nHitRangeMinMs[i]} ～ {nHitRangeMaxMs[i]}ms、{strOrderJp}。\n" +
+                    $"Perfect≦Great≦Good≦Poor\n" +
+                    $"の順は保たれます。\n" +
+                    $"曲フォルダの box.def の\n" +
+                    $"#{strBoxPrefix}{strJudge.ToUpperInvariant()}RANGE\n" +
+                    $"が優先されます。\n" +
+                    $"Config.ini: {strIniPrefix}{strJudge}",
+                    $"{strJudge} window for {strPartEn}: \u00b1ms around the note. " +
+                    $"Default {nDefaults[i]}, range {nHitRangeMinMs[i]}-{nHitRangeMaxMs[i]}. " +
+                    $"Order Perfect <= Great <= Good <= Poor is kept: {strOrderEn} " +
+                    $"A song folder's box.def (#{strBoxPrefix}{strJudge.ToUpperInvariant()}RANGE) overrides it. " +
+                    $"InputAdjust shifts the windows; this sets their width. Config.ini: {strIniPrefix}{strJudge}.");
+            }
+            return items;
+        }
+
+        /// <summary>
+        /// If the selected item is one of the given Perfect/Great/Good/Poor items, clamp it between its neighbours.
+        /// </summary>
+        private void tClampHitRangeItem(CItemInteger[] items)
+        {
+            if (items == null)
+                return;
+            int i = Array.IndexOf(items, this.listItems[this.nCurrentSelection]);
+            if (i < 0)
+                return;
+            if (i < items.Length - 1 && items[i].nCurrentValue > items[i + 1].nCurrentValue)
+                items[i].nCurrentValue = items[i + 1].nCurrentValue;
+            if (i > 0 && items[i].nCurrentValue < items[i - 1].nCurrentValue)
+                items[i].nCurrentValue = items[i - 1].nCurrentValue;
+        }
+
+        private static void tSetHitRangeItems(CItemInteger[] items, STHitRanges st)
+        {
+            items[0].nCurrentValue = st.nPerfectSizeMs;
+            items[1].nCurrentValue = st.nGreatSizeMs;
+            items[2].nCurrentValue = st.nGoodSizeMs;
+            items[3].nCurrentValue = st.nPoorSizeMs;
+        }
+
+        private static void tGetHitRangeItems(CItemInteger[] items, ref STHitRanges st)
+        {
+            st.nPerfectSizeMs = items[0].nCurrentValue;
+            st.nGreatSizeMs = items[1].nCurrentValue;
+            st.nGoodSizeMs = items[2].nCurrentValue;
+            st.nPoorSizeMs = items[3].nCurrentValue;
+        }
+        #endregion
 
 
         // CActivity 実装
@@ -3274,6 +3369,8 @@ namespace DTXMania
         private CItemToggle iGuitarGraph;
 
         private CItemInteger iDrumsInputAdjustTimeMs;		// #23580 2011.1.3 yyagi
+        private CItemInteger[] iDrumsHitRanges;			// Perfect, Great, Good, Poor ([HitRange] Drum*)
+        private CItemInteger[] iDrumsPedalHitRanges;		// Perfect, Great, Good, Poor ([HitRange] DrumPedal*)
         private CItemInteger iGuitarInputAdjustTimeMs;		//
         private CItemInteger iBassInputAdjustTimeMs;		//
         private CItemList iSystemSkinSubfolder;				// #28195 2012.5.2 yyagi
@@ -3486,6 +3583,8 @@ namespace DTXMania
             this.iDrumsPosition.n現在選択されている項目番号 = (int)CDTXMania.ConfigIni.JudgementStringPosition.Drums;
             this.iDrumsTight.bON = CDTXMania.ConfigIni.bTight;
             this.iDrumsInputAdjustTimeMs.nCurrentValue = CDTXMania.ConfigIni.nInputAdjustTimeMs.Drums;
+            tSetHitRangeItems(this.iDrumsHitRanges, CDTXMania.ConfigIni.stDrumHitRanges);
+            tSetHitRangeItems(this.iDrumsPedalHitRanges, CDTXMania.ConfigIni.stDrumPedalHitRanges);
             this.iDrumsHIDSUD.n現在選択されている項目番号 = CDTXMania.ConfigIni.nHidSud.Drums;
 
             this.iSystemHHGroup.n現在選択されている項目番号 = (int)CDTXMania.ConfigIni.eHHGroup;
@@ -3696,6 +3795,8 @@ namespace DTXMania
             CDTXMania.ConfigIni.JudgementStringPosition.Drums = (EType)this.iDrumsPosition.n現在選択されている項目番号;
             CDTXMania.ConfigIni.bTight = this.iDrumsTight.bON;
             CDTXMania.ConfigIni.nInputAdjustTimeMs.Drums = this.iDrumsInputAdjustTimeMs.nCurrentValue;		// #23580 2011.1.3 yyagi
+            tGetHitRangeItems(this.iDrumsHitRanges, ref CDTXMania.ConfigIni.stDrumHitRanges);
+            tGetHitRangeItems(this.iDrumsPedalHitRanges, ref CDTXMania.ConfigIni.stDrumPedalHitRanges);
             CDTXMania.ConfigIni.nHidSud.Drums = this.iDrumsHIDSUD.n現在選択されている項目番号;
 
             CDTXMania.ConfigIni.eHHGroup = (EHHGroup)this.iSystemHHGroup.n現在選択されている項目番号;

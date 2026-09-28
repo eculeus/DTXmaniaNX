@@ -41,6 +41,24 @@ bindings and settings are kept.
   and a check of the CSV (one file, BOM, header, a row per tap, missed-note rows, the lag
   arithmetic on every hit, the summary), and it now asserts the earlier runs, with the option at
   its default, made no `HitLogs` folder.
+- **Drum judgement windows in the menu.** `Config > Drums`, right after `InputAdjust`:
+  `PerfectRange`, `GreatRange`, `GoodRange`, `PoorRange` for the pads and `PedalPerfect`,
+  `PedalGreat`, `PedalGood`, `PedalPoor` for the pedals (BD, LP, LBD) — the ± ms around a note
+  within which a hit counts as that judgement. They are the existing `[HitRange]` keys
+  (`DrumPerfect`/`DrumGreat`/`DrumGood`/`DrumPoor`, `DrumPedal*`), which until now could only be
+  changed by editing `Config.ini`; defaults stay 34 / 67 / 84 / 117.
+- Why: on an e-kit (Roland TD-07) ±34 ms Perfect is unforgiving, and widening it meant a text
+  editor. The two timing settings now sit together: `InputAdjust` *shifts* the windows to cancel
+  a steady early/late offset (the Melodics-style calibration), these set how *wide* they are.
+- Menu ranges: Perfect 10–100 ms, Great/Good/Poor 10–200 ms. The windows keep the order
+  Perfect ≤ Great ≤ Good ≤ Poor: the item being changed stops at its neighbours, so to widen
+  Perfect past 67 raise Great first. Nothing is re-sorted behind your back, and a value read from
+  a hand-edited `Config.ini` (the file accepts 0–999) is shown and saved as it is until you change
+  that item.
+- A song folder's `box.def` (`#DRUMPERFECTRANGE`, `#DRUMPEDALPERFECTRANGE`, legacy
+  `#PERFECTRANGE`, ...) still overrides these for that folder. Changes apply from the next song
+  played; `Config.ini` is written with the same `[HitRange]` keys as before, so it stays readable by
+  upstream, and with the items left alone the file and the judgement are exactly as before.
 
 ## 1.5.0-beta.18 — 2026-09-19
 
